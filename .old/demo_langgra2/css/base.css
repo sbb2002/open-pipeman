@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600&display=swap');
+
+/* ── RESET & BASE ────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d0f12;
+  --pattern-color: rgba(255,255,255,0.07);
+  --bg2:       #13161b;
+  --bg3:       #1a1e26;
+  --bg4:       #222733;
+  --border:    #2a2f3d;
+  --border2:   #353b4d;
+  --text:      #cdd6f4;
+  --text2:     #7c869e;
+  --text3:     #454d61;
+  --accent:    #7ee8a2;
+  --accent2:   #4ade80;
+  --blue:      #60a5fa;
+  --red:       #f87171;
+  --orange:    #fb923c;
+  --yellow:    #fbbf24;
+  --mono:      'JetBrains Mono', monospace;
+  --sans:      'Space Grotesk', sans-serif;
+  --sidebar-w: 200px;
+  --panel-w:   280px;
+  --header-h:  52px;
+  --status-h:  28px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+
+/* ── LAYOUT ──────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: 100vh;
+  height: 100vh;
+}
+
+#main {
+  display: grid;
+  grid-template-rows: var(--header-h) 1fr var(--status-h);
+  overflow: hidden;
+}
+
+/* ── SCROLLBARS ──────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hover 3D 클릭 예제</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    body {
+      background: #0d0d0d;
+      color: #eee;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .hover-3d {
+      position: relative;
+      display: inline-block;
+      transform-style: preserve-3d;
+      transform: perspective(600px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+      transition: transform 0.15s ease;
+      cursor: pointer;
+    }
+
+    .hover-3d > div.zone {
+      position: absolute;
+      z-index: 10;
+      width: 33.33%;
+      height: 33.33%;
+    }
+
+    .hover-3d > div.zone:nth-of-type(1) { top: 0;      left: 0;      }
+    .hover-3d > div.zone:nth-of-type(2) { top: 0;      left: 33.33%; width: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(3) { top: 0;      right: 0;     }
+    .hover-3d > div.zone:nth-of-type(4) { top: 33.33%; left: 0;      height: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(5) { top: 33.33%; left: 33.33%; width: 33.34%; height: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(6) { top: 33.33%; right: 0;     height: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(7) { bottom: 0;   left: 0;      }
+    .hover-3d > div.zone:nth-of-type(8) { bottom: 0;   left: 33.33%; width: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(9) { bottom: 0;   right: 0;     }
+
+    .album-grid {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .album-wrapper {
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .album-wrapper figure {
+      margin: 0;
+      width: 160px;
+      height: 160px;
+    }
+
+    .album-wrapper figure img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .info-box {
+      margin-top: 1.5rem;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+      min-height: 64px;
+      font-size: 13px;
+      color: #aaa;
+      transition: all 0.2s;
+    }
+
+    .info-box p {
+      margin: 0;
+    }
+
+    .info-box .album-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div style="width: 100%; max-width: 600px;">
+
+    <!-- 앨범 목록 -->
+    <div class="album-grid">
+
+      <div class="hover-3d album-wrapper"
+        data-album-id="1"
+        data-title="Afterglow 1st Album"
+        data-artist="Afterglow"
+        data-year="2018">
+        <figure>
+          <img src="https://img.daisyui.com/images/stock/card-1.webp" alt="Afterglow 1st Album">
+        </figure>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+      </div>
+
+      <div class="hover-3d album-wrapper"
+        data-album-id="2"
+        data-title="Roselia 2nd Single"
+        data-artist="Roselia"
+        data-year="2019">
+        <figure>
+          <img src="https://img.daisyui.com/images/stock/card-2.webp" alt="Roselia 2nd Single">
+        </figure>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+      </div>
+
+      <div class="hover-3d album-wrapper"
+        data-album-id="3"
+        data-title="Poppin'Party Best"
+        data-artist="Poppin'Party"
+        data-year="2020">
+        <figure>
+          <img src="https://img.daisyui.com/images/stock/card-3.webp" alt="Poppin Party Best">
+        </figure>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+      </div>
+
+    </div>
+
+    <!-- 클릭 시 데이터 표시 영역 -->
+    <div class="info-box" id="info-box">
+      <p>앨범을 클릭하면 정보가 표시됩니다</p>
+    </div>
+
+  </div>
+
+  <script>
+    const TILT = [
+      [-8, -8], [0, -8], [8, -8],
+      [-8,  0], [0,  0], [8,  0],
+      [-8,  8], [0,  8], [8,  8],
+    ];
+
+    const infoBox = document.getElementById('info-box');
+
+    document.querySelectorAll('.hover-3d').forEach(el => {
+      const zones = el.querySelectorAll('.zone');
+
+      // 호버존별 기울기 적용
+      zones.forEach((zone, i) => {
+        zone.addEventListener('mouseenter', () => {
+          el.style.setProperty('--rx', TILT[i][0] + 'deg');
+          el.style.setProperty('--ry', TILT[i][1] + 'deg');
+        });
+      });
+
+      // 마우스 벗어나면 원위치
+      el.addEventListener('mouseleave', () => {
+        el.style.setProperty('--rx', '0deg');
+        el.style.setProperty('--ry', '0deg');
+      });
+
+      // 클릭 시 데이터 로딩
+      // zone 클릭 → 이벤트 버블링 → hover-3d의 click 발동
+      el.addEventListener('click', () => {
+        const { albumId, title, artist, year } = el.dataset;
+        loadAlbumData(albumId, title, artist, year);
+      });
+    });
+
+    function loadAlbumData(id, title, artist, year) {
+      // 로딩 상태 표시
+      infoBox.innerHTML = '<p>불러오는 중...</p>';
+
+      // 실제 프로젝트에서는 아래 setTimeout을 fetch로 교체
+      // fetch('/api/album/' + id)
+      //   .then(res => res.json())
+      //   .then(data => { infoBox.innerHTML = ...; });
+      setTimeout(() => {
+        infoBox.innerHTML = `
+          <p class="album-title">${title}</p>
+          <p>아티스트: ${artist} &nbsp;·&nbsp; 발매: ${year}</p>
+        `;
+      }, 400);
+    }
+  </script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hover 3D 클릭 예제</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    body {
+      background: #0d0d0d;
+      color: #eee;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .hover-3d {
+      position: relative;
+      display: inline-block;
+      transform-style: preserve-3d;
+      transform: perspective(600px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+      transition: transform 0.15s ease;
+      cursor: pointer;
+    }
+
+    .hover-3d > div.zone {
+      position: absolute;
+      z-index: 10;
+      width: 33.33%;
+      height: 33.33%;
+    }
+
+    .hover-3d > div.zone:nth-of-type(1) { top: 0;      left: 0;      }
+    .hover-3d > div.zone:nth-of-type(2) { top: 0;      left: 33.33%; width: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(3) { top: 0;      right: 0;     }
+    .hover-3d > div.zone:nth-of-type(4) { top: 33.33%; left: 0;      height: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(5) { top: 33.33%; left: 33.33%; width: 33.34%; height: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(6) { top: 33.33%; right: 0;     height: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(7) { bottom: 0;   left: 0;      }
+    .hover-3d > div.zone:nth-of-type(8) { bottom: 0;   left: 33.33%; width: 33.34%; }
+    .hover-3d > div.zone:nth-of-type(9) { bottom: 0;   right: 0;     }
+
+    .album-grid {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .album-wrapper {
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .album-wrapper figure {
+      margin: 0;
+      width: 160px;
+      height: 160px;
+    }
+
+    .album-wrapper figure img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .info-box {
+      margin-top: 1.5rem;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+      min-height: 64px;
+      font-size: 13px;
+      color: #aaa;
+      transition: all 0.2s;
+    }
+
+    .info-box p {
+      margin: 0;
+    }
+
+    .info-box .album-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div style="width: 100%; max-width: 600px;">
+
+    <!-- 앨범 목록 -->
+    <div class="album-grid">
+
+      <div class="hover-3d album-wrapper"
+        data-album-id="1"
+        data-title="Afterglow 1st Album"
+        data-artist="Afterglow"
+        data-year="2018">
+        <figure>
+          <img src="https://img.daisyui.com/images/stock/card-1.webp" alt="Afterglow 1st Album">
+        </figure>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+      </div>
+
+      <div class="hover-3d album-wrapper"
+        data-album-id="2"
+        data-title="Roselia 2nd Single"
+        data-artist="Roselia"
+        data-year="2019">
+        <figure>
+          <img src="https://img.daisyui.com/images/stock/card-2.webp" alt="Roselia 2nd Single">
+        </figure>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+      </div>
+
+      <div class="hover-3d album-wrapper"
+        data-album-id="3"
+        data-title="Poppin'Party Best"
+        data-artist="Poppin'Party"
+        data-year="2020">
+        <figure>
+          <img src="https://img.daisyui.com/images/stock/card-3.webp" alt="Poppin Party Best">
+        </figure>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+        <div class="zone"></div>
+      </div>
+
+    </div>
+
+    <!-- 클릭 시 데이터 표시 영역 -->
+    <div class="info-box" id="info-box">
+      <p>앨범을 클릭하면 정보가 표시됩니다</p>
+    </div>
+
+  </div>
+
+  <script>
+    const TILT = [
+      [-8, -8], [0, -8], [8, -8],
+      [-8,  0], [0,  0], [8,  0],
+      [-8,  8], [0,  8], [8,  8],
+    ];
+
+    const infoBox = document.getElementById('info-box');
+
+    document.querySelectorAll('.hover-3d').forEach(el => {
+      const zones = el.querySelectorAll('.zone');
+
+      // 호버존별 기울기 적용
+      zones.forEach((zone, i) => {
+        zone.addEventListener('mouseenter', () => {
+          el.style.setProperty('--rx', TILT[i][0] + 'deg');
+          el.style.setProperty('--ry', TILT[i][1] + 'deg');
+        });
+      });
+
+      // 마우스 벗어나면 원위치
+      el.addEventListener('mouseleave', () => {
+        el.style.setProperty('--rx', '0deg');
+        el.style.setProperty('--ry', '0deg');
+      });
+
+      // 클릭 시 데이터 로딩
+      // zone 클릭 → 이벤트 버블링 → hover-3d의 click 발동
+      el.addEventListener('click', () => {
+        const { albumId, title, artist, year } = el.dataset;
+        loadAlbumData(albumId, title, artist, year);
+      });
+    });
+
+    function loadAlbumData(id, title, artist, year) {
+      // 로딩 상태 표시
+      infoBox.innerHTML = '<p>불러오는 중...</p>';
+
+      // 실제 프로젝트에서는 아래 setTimeout을 fetch로 교체
+      // fetch('/api/album/' + id)
+      //   .then(res => res.json())
+      //   .then(data => { infoBox.innerHTML = ...; });
+      setTimeout(() => {
+        infoBox.innerHTML = `
+          <p class="album-title">${title}</p>
+          <p>아티스트: ${artist} &nbsp;·&nbsp; 발매: ${year}</p>
+        `;
+      }, 400);
+    }
+  </script>
+
+</body>
+</html>

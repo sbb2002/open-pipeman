@@ -1,0 +1,485 @@
+ABCDEFG
+  <title>Pipeline Builder</title>
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/cell.css" />
+짜잔
+<body>
+  <div id="app">
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <div id="sidebar-logo">
+        <span class="logo-mark">⬡</span>
+        <span class="logo-text">PIPELINE</span>
+      </div>
+
+사실 속으신거에여
+
+      <div class="sidebar-section-label">RECENTS</div>
+      <ul id="recent-list">
+        <!-- populated by pipeline.js from localStorage -->
+      </ul>
+
+      <div class="sidebar-section-label" style="margin-top:auto;">CELLS</div>
+      <div id="cell-palette">
+        <div class="palette-item" draggable="true" data-type="cell">
+          <span class="palette-icon">◈</span>
+          <span>Cell</span>
+        </div>
+      </div>
+
+      <button id="btn-settings">
+        <span class="settings-icon">⚙</span>
+        <span>Settings</span>
+      </button>
+    </aside>
+
+    <!-- SETTINGS POPUP -->
+    <div id="settings-overlay" class="hidden">
+      <div id="settings-modal">
+        <div id="settings-header">
+          <span id="settings-title">Settings</span>
+          <button id="settings-close">✕</button>
+        </div>
+                <div id="settings-tabs-wrap">
+        <div id="settings-tabs">
+          <button class="settings-tab active" data-tab="general">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 4v3l2 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            General
+          </button>
+          <button class="settings-tab" data-tab="apikeys">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 9l-3 3m3-3 1-1m-1 1 1 1M8 6a3 3 0 1 0-4.24-4.24A3 3 0 0 0 8 6z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            API Keys
+          </button>
+        </div>
+
+        <div id="settings-body">
+
+          <!-- ── GENERAL TAB ── -->
+          <div class="settings-tab-panel active" id="tab-general">
+
+
+          <!-- THEME -->
+          <div class="settings-section">
+            <div class="settings-section-label">THEME</div>
+            <div class="settings-row theme-toggle-row">
+              <button class="theme-btn active" data-theme="dark">
+                <span class="theme-preview dark-preview"></span>
+                Dark
+              </button>
+              <button class="theme-btn" data-theme="light">
+                <span class="theme-preview light-preview"></span>
+                Light
+              </button>
+            </div>
+          </div>
+
+          <!-- BACKGROUND PATTERN -->
+          <div class="settings-section">
+            <div class="settings-section-label">BACKGROUND PATTERN</div>
+            <div class="settings-row pattern-row">
+              <button class="pattern-btn active" data-pattern="cross" title="X 무늬">
+                <svg width="32" height="32" viewBox="0 0 32 32"><line x1="4" y1="4" x2="28" y2="28" stroke="currentColor" stroke-width="1.5"/><line x1="28" y1="4" x2="4" y2="28" stroke="currentColor" stroke-width="1.5"/></svg>
+              </button>
+              <button class="pattern-btn" data-pattern="dots" title="점 무늬">
+                <svg width="32" height="32" viewBox="0 0 32 32"><circle cx="8" cy="8" r="2" fill="currentColor"/><circle cx="24" cy="8" r="2" fill="currentColor"/><circle cx="8" cy="24" r="2" fill="currentColor"/><circle cx="24" cy="24" r="2" fill="currentColor"/></svg>
+              </button>
+              <button class="pattern-btn" data-pattern="grid" title="격자 무늬">
+                <svg width="32" height="32" viewBox="0 0 32 32"><path d="M0 8h32M0 16h32M0 24h32M8 0v32M16 0v32M24 0v32" stroke="currentColor" stroke-width="1" opacity="0.6"/></svg>
+              </button>
+              <button class="pattern-btn" data-pattern="diagonal" title="+ 무늬">
+                <svg width="32" height="32" viewBox="0 0 32 32"><line x1="8" y1="4" x2="8" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="24" y1="4" x2="24" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="20" y1="8" x2="28" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="8" y1="20" x2="8" y2="28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="4" y1="24" x2="12" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="24" y1="20" x2="24" y2="28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="20" y1="24" x2="28" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </button>
+              <button class="pattern-btn" data-pattern="none" title="없음">
+                <svg width="32" height="32" viewBox="0 0 32 32"><line x1="4" y1="28" x2="28" y2="4" stroke="currentColor" stroke-width="1.5" opacity="0.4"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- CELL THEME -->
+          <div class="settings-section">
+            <div class="settings-section-label">CELL COLOR</div>
+            <div class="settings-row cell-color-row" id="cell-color-row">
+              <button class="cell-color-btn active" data-color="default" style="--swatch:#13161b;" title="Default"><span class="color-swatch"></span></button>
+              <button class="cell-color-btn" data-color="#1e3a5f" style="--swatch:#1e3a5f;" title="Navy"><span class="color-swatch"></span></button>
+              <button class="cell-color-btn" data-color="#1a2e1a" style="--swatch:#1a2e1a;" title="Forest"><span class="color-swatch"></span></button>
+              <button class="cell-color-btn" data-color="#2e1a2e" style="--swatch:#2e1a2e;" title="Plum"><span class="color-swatch"></span></button>
+              <button class="cell-color-btn" data-color="#2e2218" style="--swatch:#2e2218;" title="Mocha"><span class="color-swatch"></span></button>
+              <button class="cell-color-btn" data-color="#1f2937" style="--swatch:#1f2937;" title="Slate"><span class="color-swatch"></span></button>
+              <button class="cell-color-btn" data-color="#ffffff" style="--swatch:#ffffff;" title="White"><span class="color-swatch"></span></button>
+              <button class="cell-color-btn rainbow-picker-btn"  data-picker="cell-color-custom" title="Custom"><span class="rainbow-swatch"></span></button>
+            </div>
+          </div>
+
+          <!-- I/O CELL COLORS -->
+          <div class="settings-section">
+            <div class="settings-section-label">INPUT CELL COLOR</div>
+            <div class="settings-row cell-color-row">
+              <button class="io-color-btn active" data-target="input" data-color="#1e3a5f" style="--swatch:#1e3a5f;" title="Navy"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="input" data-color="#1a3a2a" style="--swatch:#1a3a2a;" title="Forest"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="input" data-color="#0e2940" style="--swatch:#0e2940;" title="Deep Blue"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="input" data-color="#1a1a4a" style="--swatch:#1a1a4a;" title="Indigo"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="input" data-color="#2a4a1a" style="--swatch:#2a4a1a;" title="Lime"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="input" data-color="#3a0a0a" style="--swatch:#3a0a0a;" title="Dark Red"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="input" data-color="#2a2a00" style="--swatch:#2a2a00;" title="Olive"><span class="color-swatch"></span></button>
+              <button class="io-color-btn rainbow-picker-btn" data-target="input" data-picker="input-color-custom" title="Custom"><span class="rainbow-swatch"></span></button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-label">OUTPUT CELL COLOR</div>
+            <div class="settings-row cell-color-row">
+              <button class="io-color-btn active" data-target="output" data-color="#5f1e1e" style="--swatch:#5f1e1e;" title="Crimson"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="output" data-color="#4a1a2a" style="--swatch:#4a1a2a;" title="Plum"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="output" data-color="#3a2a00" style="--swatch:#3a2a00;" title="Amber"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="output" data-color="#3a1a00" style="--swatch:#3a1a00;" title="Rust"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="output" data-color="#4a1a4a" style="--swatch:#4a1a4a;" title="Violet"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="output" data-color="#002a3a" style="--swatch:#002a3a;" title="Teal"><span class="color-swatch"></span></button>
+              <button class="io-color-btn" data-target="output" data-color="#1a1a1a" style="--swatch:#1a1a1a;" title="Charcoal"><span class="color-swatch"></span></button>
+              <button class="io-color-btn rainbow-picker-btn" data-target="output" data-picker="output-color-custom" title="Custom"><span class="rainbow-swatch"></span></button>
+            </div>
+          </div>
+
+          <!-- CELL FONT -->
+          <div class="settings-section">
+            <div class="settings-section-label">CELL FONT</div>
+            <div class="settings-row" style="gap:8px; flex-wrap:wrap; align-items:center;">
+              <button class="font-family-btn active" data-font="sans">Sans</button>
+              <button class="font-family-btn" data-font="mono">Mono</button>
+              <button class="font-family-btn" data-font="serif">Serif</button>
+            </div>
+            <div class="settings-row" style="margin-top:10px; align-items:center; gap:10px;">
+              <span class="settings-hint">Name size</span>
+              <button class="font-size-btn" data-target="name" data-delta="-1">−</button>
+              <span id="font-size-name-label" class="font-size-label">13px</span>
+              <button class="font-size-btn" data-target="name" data-delta="1">+</button>
+            </div>
+            <div class="settings-row" style="margin-top:6px; align-items:center; gap:10px;">
+              <span class="settings-hint">IO type size</span>
+              <button class="font-size-btn" data-target="io" data-delta="-1">−</button>
+              <span id="font-size-io-label" class="font-size-label">10px</span>
+              <button class="font-size-btn" data-target="io" data-delta="1">+</button>
+            </div>
+            <div class="settings-row" style="margin-top:10px; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span class="settings-hint">Name color</span>
+              <div class="font-color-swatches" id="font-color-name-swatches">
+                <button class="font-color-btn active" data-target="name" data-color="default" style="--fc:var(--text);" title="Default"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="name" data-color="#ffffff" style="--fc:#ffffff;" title="White"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="name" data-color="#7ee8a2" style="--fc:#7ee8a2;" title="Green"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="name" data-color="#60a5fa" style="--fc:#60a5fa;" title="Blue"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="name" data-color="#fbbf24" style="--fc:#fbbf24;" title="Yellow"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="name" data-color="#f87171" style="--fc:#f87171;" title="Red"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="name" data-color="#111111" style="--fc:#111111;" title="Black"><span class="font-color-dot"></span></button>
+              </div>
+              <input type="color" id="font-color-name-custom" value="#cdd6f4" title="Custom name color" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:5px;padding:2px;background:var(--bg3);cursor:pointer;"/>
+            </div>
+            <div class="settings-row" style="margin-top:8px; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span class="settings-hint">IO color</span>
+              <div class="font-color-swatches" id="font-color-io-swatches">
+                <button class="font-color-btn active" data-target="io" data-color="default" style="--fc:var(--accent);" title="Default"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="io" data-color="#ffffff" style="--fc:#ffffff;" title="White"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="io" data-color="#7ee8a2" style="--fc:#7ee8a2;" title="Green"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="io" data-color="#60a5fa" style="--fc:#60a5fa;" title="Blue"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="io" data-color="#fbbf24" style="--fc:#fbbf24;" title="Yellow"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="io" data-color="#f87171" style="--fc:#f87171;" title="Red"><span class="font-color-dot"></span></button>
+                <button class="font-color-btn" data-target="io" data-color="#111111" style="--fc:#111111;" title="Black"><span class="font-color-dot"></span></button>
+              </div>
+              <input type="color" id="font-color-io-custom" value="#7ee8a2" title="Custom IO color" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:5px;padding:2px;background:var(--bg3);cursor:pointer;"/>
+            </div>
+          </div>
+
+          <!-- CELL SHAPE -->
+          <div class="settings-section">
+            <div class="settings-section-label">CELL SHAPE</div>
+            <div class="settings-row cell-shape-row">
+              <button class="cell-shape-btn active" data-radius="10" title="Rounded">
+                <svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              </button>
+              <button class="cell-shape-btn" data-radius="2" title="Square">
+                <svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              </button>
+              <button class="cell-shape-btn" data-radius="12" title="Pill">
+                <svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              </button>
+            </div>
+          </div>
+
+          </div>
+
+          <!-- ── API KEYS TAB ── -->
+          <div class="settings-tab-panel hidden" id="tab-apikeys">
+
+            <div class="settings-section">
+              <div class="settings-section-label">ANTHROPIC</div>
+              <div class="field-group">
+                <label>API Key</label>
+                <div class="apikey-row">
+                  <input type="password" id="apikey-anthropic" placeholder="sk-ant-..." autocomplete="off" spellcheck="false"/>
+                  <button class="apikey-toggle" data-target="apikey-anthropic" title="Show/Hide">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
+                  </button>
+                </div>
+                <span class="apikey-hint">Claude models (claude-sonnet-4-6, claude-opus-4-6 …)</span>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-label">GOOGLE</div>
+              <div class="field-group">
+                <label>API Key</label>
+                <div class="apikey-row">
+                  <input type="password" id="apikey-google" placeholder="AIza..." autocomplete="off" spellcheck="false"/>
+                  <button class="apikey-toggle" data-target="apikey-google" title="Show/Hide">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
+                  </button>
+                </div>
+                <span class="apikey-hint">Gemini models (gemini-2.0-flash …)</span>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-label">OPENAI</div>
+              <div class="field-group">
+                <label>API Key</label>
+                <div class="apikey-row">
+                  <input type="password" id="apikey-openai" placeholder="sk-..." autocomplete="off" spellcheck="false"/>
+                  <button class="apikey-toggle" data-target="apikey-openai" title="Show/Hide">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
+                  </button>
+                </div>
+                <span class="apikey-hint">GPT models (gpt-4o …)</span>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-label">BACKEND URL</div>
+              <div class="field-group">
+                <label>FastAPI Endpoint</label>
+                <input type="text" id="apikey-backend" placeholder="http://localhost:8000" spellcheck="false"/>
+                <span class="apikey-hint">Python 백엔드 서버 주소</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+        </div><!-- /settings-tabs-wrap -->
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div id="main">
+      <!-- HEADER -->
+      <header id="header">
+        <div id="project-name-wrap">
+          <span class="project-label">PROJECT</span>
+          <input id="project-name" type="text" value="Video OCR Pipeline" spellcheck="false" />
+        </div>
+        <div id="header-actions">
+          <button id="btn-run" class="action-btn run">
+            <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11" fill="currentColor"/></svg>
+            Run
+          </button>
+          <button id="btn-stop" class="action-btn stop" disabled>
+            <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="currentColor"/></svg>
+            Stop
+          </button>
+          <button id="btn-save" class="action-btn save">
+            <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2h6l2 2v6H2V2zm3 6h2v-3H5v3zm1-7v3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+            Save
+          </button>
+          <button id="btn-load" class="action-btn load">
+            <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 10h8M6 2v6M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Load
+          </button>
+        </div>
+      </header>
+
+      <!-- CANVAS -->
+      <div id="canvas-wrap">
+        <canvas id="edge-canvas"></canvas>
+        <div id="canvas" 
+          ondragover="event.preventDefault()" 
+          ondrop="handleDrop(event)">
+          <!-- nodes rendered by JS -->
+        </div>
+        <div id="canvas-hint">← Drag cells from the left panel to begin</div>
+        <div id="cell-tooltip" class="hidden"></div>
+        <!-- ZOOM CONTROLS -->
+        <div id="zoom-bar">
+          <button id="zoom-out" title="축소">−</button>
+          <input id="zoom-pct" type="number" value="100" min="30" max="250" title="줌 %"/>
+          <span class="zoom-unit">%</span>
+          <button id="zoom-in" title="확대">＋</button>
+          <button id="zoom-reset" title="원래대로">↺</button>
+        </div>
+      </div>
+
+      <!-- STATUS BAR -->
+      <div id="statusbar">
+        <span id="status-validity">● Ready</span>
+        <span id="status-ws">WS: disconnected</span>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <aside id="inspector" class="closed">
+      <div id="inspector-header">
+        <span id="inspector-title">Cell Config</span>
+        <button id="inspector-close">✕</button>
+      </div>
+
+      <form id="inspector-form" onsubmit="return false;">
+        <div class="field-group">
+          <label>Cell Name <span class="required">*</span></label>
+          <input type="text" id="f-name" placeholder="e.g. Frame Extractor" />
+        </div>
+
+        <div class="field-group">
+          <label>Model <span class="required">*</span></label>
+          <select id="f-model">
+            <option value="">— select —</option>
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+            <option value="claude-opus-4-6">claude-opus-4-6</option>
+            <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+          </select>
+        </div>
+
+        <div class="field-row" id="f-row-types">
+          <div class="field-group" id="f-group-input-type">
+            <label>Input Type <span class="required">*</span></label>
+            <input type="text" id="f-input-type" placeholder="e.g. VideoFile" />
+          </div>
+          <div class="field-group" id="f-group-output-type">
+            <label>Output Type <span class="required">*</span></label>
+            <input type="text" id="f-output-type" placeholder="e.g. TextFile" />
+          </div>
+        </div>
+
+        <div class="field-group" id="f-group-input-desc">
+          <label>Input Description <span class="required">*</span></label>
+          <textarea id="f-input-desc" placeholder="Describe what this cell receives..." rows="2"></textarea>
+        </div>
+
+        <div class="field-group" id="f-group-output-desc">
+          <label>Output Description <span class="required">*</span></label>
+          <textarea id="f-output-desc" placeholder="Describe what this cell produces..." rows="2"></textarea>
+        </div>
+
+        <div class="field-group">
+          <label>System Prompt <span class="required">*</span></label>
+          <textarea id="f-prompt" placeholder="You are a specialized agent that..." rows="5"></textarea>
+        </div>
+
+        <div class="field-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="f-websearch" />
+            <span class="checkbox-custom"></span>
+            <span>Allow Web Search</span>
+          </label>
+          <div id="domain-wrap" class="hidden">
+            <input type="text" id="f-domains" placeholder="allowed domains, comma-separated" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Memo</label>
+          <textarea id="f-memo" placeholder="사용자 참고용 메모 (프롬프트에 영향 없음)" rows="3"></textarea>
+        </div>
+
+        <button type="button" id="apply-btn">Apply</button>
+      </form>
+    </aside>
+  </div>
+
+  <!-- WARNING MODAL -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <div id="modal-title">Cannot Run Pipeline</div>
+      <div id="modal-body"></div>
+      <button id="modal-close">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- CONTEXT MENU -->
+  <div id="ctx-menu"></div>
+
+  <!-- CONFIRM DIALOG -->
+  <div id="confirm-overlay" class="hidden">
+    <div id="confirm-modal">
+      <div id="confirm-title"></div>
+      <div id="confirm-body"></div>
+      <div id="confirm-actions">
+        <button id="confirm-no">아니오 — 기존 유지</button>
+        <button id="confirm-yes">예 — 덮어쓰기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD PROJECT POPUP -->
+  <div id="load-overlay" class="hidden">
+    <div id="load-modal">
+      <div id="load-header">
+        <span id="load-title">Load Project</span>
+        <button id="load-close">✕</button>
+      </div>
+
+      <!-- 드래그 앤 드롭 존 -->
+      <div id="load-dropzone">
+        <div id="load-dropzone-inner">
+          <span id="load-drop-icon">⬆</span>
+          <span id="load-drop-label">JSON 파일을 여기에 드래그하거나</span>
+          <label id="load-file-btn" for="load-file-input">파일 선택</label>
+          <input type="file" id="load-file-input" accept=".json" multiple style="display:none" />
+        </div>
+      </div>
+
+      <div id="load-search-wrap">
+        <input id="load-search" type="text" placeholder="프로젝트 검색..." spellcheck="false" />
+      </div>
+      <div id="load-list-wrap">
+        <ul id="load-file-list">
+          <!-- populated by js -->
+        </ul>
+        <div id="load-empty">저장된 프로젝트가 없습니다.<br><span id="load-empty-sub">위에서 파일을 추가해보세요.</span></div>
+      </div>
+      <div id="load-footer">
+        <span id="load-selection-info">Ctrl / Shift 클릭으로 여러 개 선택</span>
+        <div id="load-footer-actions">
+          <button id="load-cancel-btn">취소</button>
+          <button id="load-confirm-btn" disabled>불러오기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="hidden">
+    <span id="toast-icon">✔</span>
+    <span id="toast-msg"></span>
+  </div>
+
+  <div id="color-popup" class="hidden"><span id="color-popup-preview"></span><span id="color-popup-hex">#000000</span></div>
+
+  <!-- CUSTOM COLOR POPUP -->
+  <div id="custom-color-popup" class="hidden">
+    <div id="ccp-hue-strip"><div id="ccp-hue-thumb"></div></div>
+    <div id="ccp-sv-box"><canvas id="ccp-canvas" width="180" height="140"></canvas><div id="ccp-sv-cursor"></div></div>
+    <div id="ccp-bottom">
+      <span id="ccp-preview"></span>
+      <input id="ccp-hex-input" type="text" maxlength="7" spellcheck="false"/>
+      <button id="ccp-apply">OK</button>
+    </div>
+  </div>
+
+  <script src="js/state.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/inspector.js"></script>
+  <script src="js/edit.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/pipeline.js"></script>
+</body>
+</html>

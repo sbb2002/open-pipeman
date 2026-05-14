@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hovering</title>
+
+      <!-- 외부 라이브러리 -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <!-- CSS 파일 분리 -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    
+    <div style="width: 100%; max-width: 600px;">
+
+        <!-- 앨범 목록 -->
+        <div class="album-grid">
+
+        <div class="hover-3d album-wrapper"
+            data-album-id="1"
+            data-title="Afterglow 1st Album"
+            data-artist="Afterglow"
+            data-year="2018">
+            <figure>
+            <img src="https://img.daisyui.com/images/stock/card-1.webp" alt="Afterglow 1st Album">
+            </figure>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+        </div>
+
+        <div class="hover-3d album-wrapper"
+            data-album-id="2"
+            data-title="Roselia 2nd Single"
+            data-artist="Roselia"
+            data-year="2019">
+            <figure>
+            <img src="https://img.daisyui.com/images/stock/card-2.webp" alt="Roselia 2nd Single">
+            </figure>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+        </div>
+
+        <div class="hover-3d album-wrapper"
+            data-album-id="3"
+            data-title="Poppin'Party Best"
+            data-artist="Poppin'Party"
+            data-year="2020">
+            <figure>
+            <img src="https://img.daisyui.com/images/stock/card-3.webp" alt="Poppin Party Best">
+            </figure>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+            <div class="zone"></div>
+        </div>
+
+        </div>
+
+        <!-- 클릭 시 데이터 표시 영역 -->
+        <div class="info-box" id="info-box">
+        <p>앨범을 클릭하면 정보가 표시됩니다</p>
+        </div>
+
+  </div>
+
+
+    <script src="script.js"></script>
+</body>
+</html>
