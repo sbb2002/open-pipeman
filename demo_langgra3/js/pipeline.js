@@ -729,14 +729,8 @@ function loadPipeline(data) {
    ───────────────────────────────────────────────── */
 let _runTimeouts = [];
 
-btnRun.addEventListener('click', () => {
-  const { canRun, errors } = validatePipeline();
-  if (!canRun) {
-    const body = '<ul>' + errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
-    showModal('Cannot Run Pipeline', body);
-    return;
-  }
-
+/* 공통 실행 엔진: startNodeId가 null이면 전체, 아니면 해당 노드부터 */
+function runFromNode(startNodeId, singleOnly) {
   _runTimeouts.forEach(t => clearTimeout(t));
   _runTimeouts = [];
   state.nodes.forEach(n => setNodeStatus(n.id, 'pending'));
@@ -763,6 +757,18 @@ btnRun.addEventListener('click', () => {
   }
   state.nodes.forEach(n => { if (!order.includes(n.id)) order.push(n.id); });
 
+  // startNodeId가 지정된 경우: 해당 노드 이후의 순서만 실행
+  let runOrder = order;
+  if (startNodeId !== null && startNodeId !== undefined) {
+    const startIdx = order.indexOf(startNodeId);
+    runOrder = startIdx >= 0 ? order.slice(startIdx) : order;
+  }
+
+  // singleOnly이면 해당 노드 하나만
+  if (singleOnly) {
+    runOrder = runOrder.slice(0, 1);
+  }
+
   state.running    = true;
   btnRun.disabled  = true;
   btnStop.disabled = false;
@@ -770,8 +776,8 @@ btnRun.addEventListener('click', () => {
 
   let i = 0;
   function runNext() {
-    if (!state.running || i >= order.length) { finishRun(); return; }
-    const nodeId = order[i++];
+    if (!state.running || i >= runOrder.length) { finishRun(); return; }
+    const nodeId = runOrder[i++];
     setNodeStatus(nodeId, 'running');
     const duration = 900 + Math.random() * 700;
     const t1 = setTimeout(() => {
@@ -783,8 +789,17 @@ btnRun.addEventListener('click', () => {
     _runTimeouts.push(t1);
   }
   runNext();
-});
+}
 
+btnRun.addEventListener('click', () => {
+  const { canRun, errors } = validatePipeline();
+  if (!canRun) {
+    const body = '<ul>' + errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
+    showModal('Cannot Run Pipeline', body);
+    return;
+  }
+  runFromNode(null, false);
+});
 btnStop.addEventListener('click', () => {
   state.running = false;
   _runTimeouts.forEach(t => clearTimeout(t));

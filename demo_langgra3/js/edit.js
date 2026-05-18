@@ -115,8 +115,45 @@ document.getElementById('canvas-wrap').addEventListener('contextmenu', e => {
         action: () => { selectNode(nodeId); }
       },
       'sep',
-    ];
-    if (!isIONode) {
+      {
+        icon: '▶', label: '이 셀만 Run',
+        action: () => {
+          const { canRun, errors } = validatePipeline();
+          if (!canRun) {
+            const body = '<ul>' + errors.map(e => '<li>' + e + '</li>').join('')  + '</ul>';
+            showModal('Cannot Run Pipeline', body);
+            return;
+          }
+          runFromNode(nodeId, true);
+        }
+      },
+      {
+        icon: '⏩', label: '이 셀부터 Run',
+        action: () => {
+          const { canRun, errors } = validatePipeline();
+          if (!canRun) {
+            const body = '<ul>' + errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
+            showModal('Cannot Run Pipeline', body);
+            return;
+          }
+          runFromNode(nodeId, false);
+        }
+      },
+      ...(state.running ? [{
+        icon: '⏹', label: 'Stop', danger: true,
+        action: () => {
+          state.running = false;
+          _runTimeouts.forEach(t => clearTimeout(t));
+          _runTimeouts = [];
+          const node = state.nodes.find(n => n.id === nodeId);
+          if (node && node.status === 'running') setNodeStatus(nodeId, 'stopped');
+          btnRun.disabled  = false;
+          btnStop.disabled = true;
+          validatePipeline();
+        }
+      }] : []),
+      'sep',
+    ];    if (!isIONode) {
       nodeMenuItems.push({
         icon: '↔', label: 'X축 정렬 — 후행 셀을 현재 X로',
         action: () => alignDescendantsX(nodeId)
