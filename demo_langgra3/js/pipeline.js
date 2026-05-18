@@ -725,17 +725,16 @@ function loadPipeline(data) {
 }
 
 /* ─────────────────────────────────────────────────
-   RUN / STOP
+   RUN / STOP  — 백엔드 SSE 스트리밍 연동
    ───────────────────────────────────────────────── */
-let _runTimeouts = [];
 
-/* 공통 실행 엔진: startNodeId가 null이면 전체, 아니면 해당 노드부터 */
-function runFromNode(startNodeId, singleOnly) {
-  _runTimeouts.forEach(t => clearTimeout(t));
-  _runTimeouts = [];
-  state.nodes.forEach(n => setNodeStatus(n.id, 'pending'));
+/* 백엔드 URL (Settings > API Keys > FastAPI Endpoint) */
+function getBackendUrl() {
+  return (document.getElementById('apikey-backend').value || 'http://localhost:8000').replace(/\/$/, '');
+}
 
-  // Kahn's topological sort
+/* 위상 정렬 (Kahn's) → 실행 순서 배열 반환 */
+function topoSort(startNodeId, singleOnly) {
   const successors   = {};
   const predecessors = {};
   state.nodes.forEach(n => { successors[n.id] = []; predecessors[n.id] = []; });
@@ -750,45 +749,254 @@ function runFromNode(startNodeId, singleOnly) {
   while (queue.length) {
     const cur = queue.shift();
     order.push(cur);
-    (successors[cur] || []).forEach(nxt => {
-      inDeg[nxt]--;
-      if (inDeg[nxt] === 0) queue.push(nxt);
-    });
+    (successors[cur] || []).forEach(nxt => { inDeg[nxt]--; if (inDeg[nxt] === 0) queue.push(nxt); });
   }
   state.nodes.forEach(n => { if (!order.includes(n.id)) order.push(n.id); });
 
-  // startNodeId가 지정된 경우: 해당 노드 이후의 순서만 실행
   let runOrder = order;
   if (startNodeId !== null && startNodeId !== undefined) {
     const startIdx = order.indexOf(startNodeId);
     runOrder = startIdx >= 0 ? order.slice(startIdx) : order;
   }
+  if (singleOnly) runOrder = runOrder.slice(0, 1);
+  return runOrder;
+}
 
-  // singleOnly이면 해당 노드 하나만
-  if (singleOnly) {
-    runOrder = runOrder.slice(0, 1);
+/* 이전 셀의 output_schema 추출 */
+function getUpstreamSchema(nodeId) {
+  const edge = state.edges.find(e => e.to === nodeId);
+  if (!edge) return {};
+  const upstream = state.nodes.find(n => n.id === edge.from);
+  return (upstream && upstream.outputSchema) ? upstream.outputSchema : {};
+}
+
+/* SSE 스트림으로 단일 셀 실행 */
+async function runCell(node, upstreamSchema) {
+  const url = getBackendUrl();
+  const cellId = String(node.id);
+
+  const body = JSON.stringify({
+    cell_id:         cellId,
+    prompt:          node.prompt || node.label || node.name || '',
+    model:           node.model  || '',
+    upstream_schema: upstreamSchema,
+  });
+
+  setNodeStatus(node.id, 'running');
+
+  try {
+    const resp = await fetch(url + '/cell/run', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let   buf     = '';
+
+    while (true) {
+      if (!state.running) {
+        reader.cancel();
+        break;
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+
+      for (const part of parts) {
+        const eventLine = part.split('\n').find(l => l.startsWith('event:'));
+        const dataLine  = part.split('\n').find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+
+        const eventName = eventLine ? eventLine.replace('event:', '').trim() : 'message';
+        let   payload;
+        try { payload = JSON.parse(dataLine.replace('data:', '').trim()); } catch { continue; }
+
+        handleSseEvent(node.id, eventName, payload);
+
+        if (eventName === 'result') {
+          const st = payload.status === 'done' ? 'done' : 'failed';
+          setNodeStatus(node.id, st);
+          if (st === 'done') {
+            const n = state.nodes.find(x => x.id === node.id);
+            if (n) n.outputSchema = payload.output_schema || {};
+          }
+          return st;
+        }
+
+        if (eventName === 'paused') {
+          setNodeStatus(node.id, 'paused');
+          state.pausedCell = { nodeId: node.id, code: payload.code };
+          showPausedPanel(node.id, payload.code);
+          return 'paused';
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[runCell] error:', err);
+    setNodeStatus(node.id, 'failed');
+    showToast('셀 실행 오류: ' + err.message);
+    return 'failed';
   }
+  return 'done';
+}
+
+/* SSE 이벤트 → 로그 패널 출력 */
+function handleSseEvent(nodeId, eventName, payload) {
+  if (eventName === 'stage_start') {
+    appendRunLog('[' + nodeId + '] ▶ ' + payload.stage);
+  } else if (eventName === 'log' && payload.logs) {
+    payload.logs.forEach(l => appendRunLog(l));
+  } else if (eventName === 'result') {
+    appendRunLog('[' + nodeId + '] ' + (payload.status === 'done' ? '✔ done' : '✖ failed'));
+  }
+}
+
+/* 로그 창 출력 헬퍼 (edit.js의 로그 창 재사용) */
+function appendRunLog(msg) {
+  if (typeof window.appendLog === 'function') { window.appendLog(msg); return; }
+  console.log('[pipeline]', msg);
+}
+
+/* Human-in-the-loop: 일시정지 패널 표시 */
+function showPausedPanel(nodeId, code) {
+  const existing = document.getElementById('paused-panel');
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'paused-panel';
+  panel.style.cssText = [
+    'position:fixed', 'bottom:60px', 'right:20px', 'width:420px',
+    'background:var(--bg2)', 'border:1px solid var(--accent)',
+    'border-radius:10px', 'padding:16px', 'z-index:9000',
+    'box-shadow:0 4px 24px rgba(0,0,0,.5)', 'font-family:var(--font-mono,monospace)',
+  ].join(';');
+
+  const title = document.createElement('div');
+  title.textContent = 'Cell #' + nodeId + ' — 코드 검토 (일시정지)';
+  title.style.cssText = 'font-size:11px;color:var(--accent);margin-bottom:10px;letter-spacing:.05em;';
+  panel.appendChild(title);
+
+  const ta = document.createElement('textarea');
+  ta.id    = 'paused-code-editor';
+  ta.value = code || '';
+  ta.style.cssText = [
+    'width:100%', 'height:200px', 'background:var(--bg3)',
+    'color:var(--text)', 'border:1px solid var(--border2)',
+    'border-radius:6px', 'padding:10px', 'font-size:12px',
+    'resize:vertical', 'box-sizing:border-box', 'line-height:1.5',
+  ].join(';');
+  panel.appendChild(ta);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;margin-top:10px;justify-content:flex-end;';
+
+  const btnResume = document.createElement('button');
+  btnResume.textContent = 'Resume';
+  btnResume.style.cssText = 'padding:6px 16px;background:var(--accent);color:#000;border:none;border-radius:6px;cursor:pointer;font-size:12px;';
+  btnResume.onclick = () => resumeCell(nodeId, null);
+
+  const btnResumeEdited = document.createElement('button');
+  btnResumeEdited.textContent = '수정 후 Resume';
+  btnResumeEdited.style.cssText = 'padding:6px 16px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:12px;';
+  btnResumeEdited.onclick = () => {
+    const edited = document.getElementById('paused-code-editor').value;
+    resumeCell(nodeId, edited);
+  };
+
+  btnRow.appendChild(btnResumeEdited);
+  btnRow.appendChild(btnResume);
+  panel.appendChild(btnRow);
+  document.body.appendChild(panel);
+}
+
+/* Resume 요청 */
+async function resumeCell(nodeId, updatedCode) {
+  const panel = document.getElementById('paused-panel');
+  if (panel) panel.remove();
+
+  const url  = getBackendUrl();
+  const body = JSON.stringify({ cell_id: String(nodeId), updated_code: updatedCode });
+
+  state.running    = true;
+  btnRun.disabled  = true;
+  btnStop.disabled = false;
+  setNodeStatus(nodeId, 'running');
+
+  try {
+    const resp = await fetch(url + '/cell/resume', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let   buf     = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        const eventLine = part.split('\n').find(l => l.startsWith('event:'));
+        const dataLine  = part.split('\n').find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+        const eventName = eventLine ? eventLine.replace('event:', '').trim() : 'message';
+        let   payload;
+        try { payload = JSON.parse(dataLine.replace('data:', '').trim()); } catch { continue; }
+        handleSseEvent(nodeId, eventName, payload);
+        if (eventName === 'result') {
+          const st = payload.status === 'done' ? 'done' : 'failed';
+          setNodeStatus(nodeId, st);
+          if (st === 'done') {
+            const n = state.nodes.find(x => x.id === nodeId);
+            if (n) n.outputSchema = payload.output_schema || {};
+          }
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[resumeCell] error:', err);
+    setNodeStatus(nodeId, 'failed');
+    showToast('Resume 오류: ' + err.message);
+  }
+  finishRun();
+}
+
+/* 전체 파이프라인 순차 실행 */
+async function runFromNode(startNodeId, singleOnly) {
+  state.nodes.forEach(n => setNodeStatus(n.id, 'pending'));
+  const runOrder = topoSort(startNodeId, singleOnly);
 
   state.running    = true;
   btnRun.disabled  = true;
   btnStop.disabled = false;
   validatePipeline();
 
-  let i = 0;
-  function runNext() {
-    if (!state.running || i >= runOrder.length) { finishRun(); return; }
-    const nodeId = runOrder[i++];
-    setNodeStatus(nodeId, 'running');
-    const duration = 900 + Math.random() * 700;
-    const t1 = setTimeout(() => {
-      if (!state.running) return;
-      setNodeStatus(nodeId, 'done');
-      const t2 = setTimeout(runNext, 150);
-      _runTimeouts.push(t2);
-    }, duration);
-    _runTimeouts.push(t1);
+  for (const nodeId of runOrder) {
+    if (!state.running) break;
+
+    const node = state.nodes.find(n => n.id === nodeId);
+    if (!node) continue;
+
+    const upstreamSchema = getUpstreamSchema(nodeId);
+    const result = await runCell(node, upstreamSchema);
+
+    if (result === 'paused') return;
+    if (result === 'failed') { finishRun(); return; }
   }
-  runNext();
+
+  if (state.running) finishRun();
 }
 
 btnRun.addEventListener('click', () => {
@@ -800,13 +1008,20 @@ btnRun.addEventListener('click', () => {
   }
   runFromNode(null, false);
 });
-btnStop.addEventListener('click', () => {
+
+btnStop.addEventListener('click', async () => {
   state.running = false;
-  _runTimeouts.forEach(t => clearTimeout(t));
-  _runTimeouts = [];
-  state.nodes.forEach(n => {
-    if (n.status === 'running') setNodeStatus(n.id, 'stopped');
-  });
+  const url = getBackendUrl();
+
+  const runningNode = state.nodes.find(n => n.status === 'running');
+  if (runningNode) {
+    setNodeStatus(runningNode.id, 'stopped');
+    try {
+      await fetch(url + '/cell/stop/' + runningNode.id, { method: 'POST' });
+    } catch (e) {
+      console.warn('[stop] backend stop 요청 실패:', e);
+    }
+  }
   btnRun.disabled  = false;
   btnStop.disabled = true;
   validatePipeline();
@@ -829,7 +1044,6 @@ function setNodeStatus(id, status) {
   if (state.selectedNode === id)        el.classList.add('selected');
   else if (state.selectedNodes.has(id)) el.classList.add('multi-selected');
 }
-
 /* ─────────────────────────────────────────────────
    INIT I/O CELLS
    ───────────────────────────────────────────────── */

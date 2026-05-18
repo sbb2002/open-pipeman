@@ -1,4 +1,16 @@
 /* ── INSPECTOR ────────────────────────────────── */
+/* f-model select 변경 리스너 — 전역에서 한 번만 등록 */
+document.addEventListener('DOMContentLoaded', () => {
+  const fModelSel = document.getElementById('f-model');
+  if (fModelSel) {
+    fModelSel.addEventListener('change', function() {
+      const wrap  = document.getElementById('f-model-custom-wrap');
+      const input = document.getElementById('f-model-custom');
+      if (wrap)  wrap.style.display  = this.value === '__ollama__' ? 'block' : 'none';
+      if (input && this.value !== '__ollama__') input.value = '';
+    });
+  }
+});/* ── INSPECTOR ────────────────────────────────── */
 function openInspector(id) {
   const node = state.nodes.find(n => n.id === id);
   if (!node) return;
@@ -35,8 +47,17 @@ function openInspector(id) {
   document.querySelector('#f-group-input-desc  label .required').style.display  = showInputFields  ? '' : 'none';
   document.querySelector('#f-group-output-desc label .required').style.display = showOutputFields ? '' : 'none';
 
-  document.getElementById('f-name').value        = node.name;
-  document.getElementById('f-model').value       = node.model;
+  document.getElementById('f-name').value = node.name;
+
+  // ── 모델 복원 (Ollama 커스텀 모델 포함) ──────────────────────────────
+  const _knownModels = ['claude-sonnet-4-6','claude-opus-4-6','claude-haiku-4-5','gpt-4o','gemini-2.0-flash',''];
+  const _isOllama = node.model && !_knownModels.includes(node.model);
+  document.getElementById('f-model').value = _isOllama ? '__ollama__' : (node.model || '');
+  const _customWrap = document.getElementById('f-model-custom-wrap');
+  if (_customWrap) _customWrap.style.display = _isOllama ? 'block' : 'none';
+  const _customInput = document.getElementById('f-model-custom');
+  if (_customInput) _customInput.value = _isOllama ? node.model : '';
+
   document.getElementById('f-input-type').value  = node.inputType;
   document.getElementById('f-output-type').value = node.outputType;
   document.getElementById('f-input-desc').value  = node.inputDesc;
@@ -69,9 +90,15 @@ document.getElementById('apply-btn').addEventListener('click', () => {
   if (!node) return;
   pushHistory();
 
-  node.name   = document.getElementById('f-name').value.trim();
-  node.model  = document.getElementById('f-model').value;
-  node.prompt = document.getElementById('f-prompt').value.trim();
+  node.name = document.getElementById('f-name').value.trim();
+
+  // ── 모델 저장 (Ollama 커스텀 모델 포함) ─────────────────────────────
+  const _sel = document.getElementById('f-model');
+  node.model = _sel.value === '__ollama__'
+    ? (document.getElementById('f-model-custom').value.trim() || '')
+    : _sel.value;
+
+  node.prompt    = document.getElementById('f-prompt').value.trim();
   node.webSearch = fWebsearch.checked;
   node.domains   = document.getElementById('f-domains').value.trim();
   node.memo      = document.getElementById('f-memo').value.trim();

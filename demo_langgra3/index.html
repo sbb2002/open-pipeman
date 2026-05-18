@@ -365,9 +365,13 @@
             <option value="claude-haiku-4-5">claude-haiku-4-5</option>
             <option value="gpt-4o">gpt-4o</option>
             <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            <option value="__ollama__">Custom (Ollama)</option>
           </select>
+          <div id="f-model-custom-wrap" style="display:none; margin-top:6px;">
+            <input type="text" id="f-model-custom" placeholder="예: llama3.2:latest" spellcheck="false" style="width:100%; box-sizing:border-box;"/>
+            <span style="font-size:11px; color:var(--text3); margin-top:4px; display:block;">ollama list 에서 확인한 모델명을 입력하세요</span>
+          </div>
         </div>
-
         <div class="field-row" id="f-row-types">
           <div class="field-group" id="f-group-input-type">
             <label>Input Type <span class="required">*</span></label>
