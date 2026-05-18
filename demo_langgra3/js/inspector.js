@@ -1,6 +1,8 @@
 /* ── INSPECTOR ────────────────────────────────── */
-/* f-model select 변경 리스너 — 전역에서 한 번만 등록 */
+/* ── 전역 이벤트 — DOMContentLoaded에서 한 번만 등록 ── */
 document.addEventListener('DOMContentLoaded', () => {
+
+  /* f-model select 토글 */
   const fModelSel = document.getElementById('f-model');
   if (fModelSel) {
     fModelSel.addEventListener('change', function() {
@@ -10,7 +12,100 @@ document.addEventListener('DOMContentLoaded', () => {
       if (input && this.value !== '__ollama__') input.value = '';
     });
   }
-});/* ── INSPECTOR ────────────────────────────────── */
+
+  /* Inspector 탭 전환 — 클릭 시 현재 선택 노드 결과도 채움 */
+  document.querySelectorAll('.inspector-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.inspector-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab    = btn.dataset.tab;
+      const form   = document.getElementById('inspector-form');
+      const result = document.getElementById('inspector-result');
+      if (form)   form.style.display   = tab === 'config' ? '' : 'none';
+      if (result) result.style.display = tab === 'result' ? 'flex' : 'none';
+
+      /* Result 탭 클릭 시 현재 선택된 노드의 결과를 채움 */
+      if (tab === 'result' && state.selectedNode !== null) {
+        const node = state.nodes.find(n => n.id === state.selectedNode);
+        if (node && node.result) {
+          _fillResultTab(node.result);
+        }
+      }
+    });
+  });
+
+  /* 복사 버튼 */
+  const copyCodeBtn = document.getElementById('copy-code-btn');
+  if (copyCodeBtn) {
+    copyCodeBtn.addEventListener('click', () => {
+      const el = document.getElementById('result-code');
+      if (el) navigator.clipboard.writeText(el.textContent)
+        .then(() => showToast('코드를 클립보드에 복사했습니다.'));
+    });
+  }
+  const copyDocBtn = document.getElementById('copy-doc-btn');
+  if (copyDocBtn) {
+    copyDocBtn.addEventListener('click', () => {
+      const el = document.getElementById('result-docstring');
+      if (el) navigator.clipboard.writeText(el.textContent)
+        .then(() => showToast('Docstring을 클립보드에 복사했습니다.'));
+    });
+  }
+});
+
+/* 결과 내용 DOM에 채우기 (내부 헬퍼) */
+function _fillResultTab(r) {
+  const codeEl   = document.getElementById('result-code');
+  const docEl    = document.getElementById('result-docstring');
+  const schemaEl = document.getElementById('result-schema');
+  if (codeEl)   codeEl.textContent   = r.code      || '(없음)';
+  if (docEl)    docEl.textContent    = r.docstring  || '(없음)';
+  if (schemaEl) schemaEl.textContent = JSON.stringify(r.output_schema || {}, null, 2) || '{}';
+}
+
+/* 스트리밍 중 Result 탭 실시간 업데이트 */
+function streamResultTab(nodeId, partial) {
+  /* 해당 셀이 현재 Inspector에 열려있지 않으면 무시 */
+  if (state.selectedNode !== nodeId) return;
+  const result = document.getElementById('inspector-result');
+  if (!result || result.style.display === 'none') return;
+  const codeEl   = document.getElementById('result-code');
+  const docEl    = document.getElementById('result-docstring');
+  const schemaEl = document.getElementById('result-schema');
+  if (partial.code      !== undefined && codeEl)   codeEl.textContent   = partial.code      || '...';
+  if (partial.docstring !== undefined && docEl)    docEl.textContent    = partial.docstring  || '...';
+  if (partial.stage     !== undefined && schemaEl && !partial.code) {
+    schemaEl.textContent = '▶ ' + partial.stage + '...';
+  }
+}
+
+/* Run 시작 시 Result 탭을 스트리밍 모드로 열기 */
+function openResultTabStreaming(nodeId) {
+  inspector.classList.remove('closed');
+  state.selectedNode = nodeId;
+
+  document.querySelectorAll('.inspector-tab').forEach(b => b.classList.remove('active'));
+  const resultTab = document.querySelector('.inspector-tab[data-tab="result"]');
+  if (resultTab) resultTab.classList.add('active');
+
+  const form   = document.getElementById('inspector-form');
+  const result = document.getElementById('inspector-result');
+  if (form)   form.style.display   = 'none';
+  if (result) result.style.display = 'flex';
+
+  /* 초기화 */
+  const codeEl   = document.getElementById('result-code');
+  const docEl    = document.getElementById('result-docstring');
+  const schemaEl = document.getElementById('result-schema');
+  if (codeEl)   codeEl.textContent   = '생성 중...';
+  if (docEl)    docEl.textContent    = '대기 중...';
+  if (schemaEl) schemaEl.textContent = '대기 중...';
+
+  const titleEl = document.getElementById('inspector-title');
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (titleEl && node) titleEl.textContent = (node.name || 'Cell') + ' — Running';
+}
+
 function openInspector(id) {
   const node = state.nodes.find(n => n.id === id);
   if (!node) return;
@@ -68,6 +163,14 @@ function openInspector(id) {
   document.getElementById('f-memo').value        = node.memo || '';
   domainWrap.classList.toggle('hidden', !node.webSearch);
 
+  /* 항상 Config 탭으로 열기 (Result 탭은 Run 완료 후 자동 전환) */
+  document.querySelectorAll('.inspector-tab').forEach(b => b.classList.remove('active'));
+  const _configTab = document.querySelector('.inspector-tab[data-tab="config"]');
+  if (_configTab) _configTab.classList.add('active');
+  const _form   = document.getElementById('inspector-form');
+  const _result = document.getElementById('inspector-result');
+  if (_form)   _form.style.display   = '';
+  if (_result) _result.style.display = 'none';
   inspector.classList.remove('closed');
 }
 
@@ -259,4 +362,23 @@ function validatePipeline() {
   }
 
   return { canRun, errors };
+}
+/* ── RESULT TAB ───────────────────────────────── */
+function openResultTab(nodeId) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (!node || !node.result) return;
+
+  inspector.classList.remove('closed');
+
+  /* Config 탭 숨기고 Result 탭 활성화 */
+  document.querySelectorAll('.inspector-tab').forEach(b => b.classList.remove('active'));
+  const resultTab = document.querySelector('.inspector-tab[data-tab="result"]');
+  if (resultTab) resultTab.classList.add('active');
+
+  const form   = document.getElementById('inspector-form');
+  const result = document.getElementById('inspector-result');
+  if (form)   form.style.display   = 'none';
+  if (result) result.style.display = 'flex';
+
+  _fillResultTab(node.result);
 }

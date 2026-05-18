@@ -350,6 +350,13 @@
         <button id="inspector-close">✕</button>
       </div>
 
+      <!-- TABS -->
+      <div id="inspector-tabs">
+        <button class="inspector-tab active" data-tab="config">Config</button>
+        <button class="inspector-tab" data-tab="result">Result</button>
+      </div>
+
+      <!-- CONFIG TAB -->
       <form id="inspector-form" onsubmit="return false;">
         <div class="field-group">
           <label>Cell Name <span class="required">*</span></label>
@@ -416,8 +423,31 @@
 
         <button type="button" id="apply-btn">Apply</button>
       </form>
-    </aside>
-  </div>
+
+      <!-- RESULT TAB -->
+      <div id="inspector-result" style="display:none;">
+        <div class="result-section">
+          <div class="result-section-header">
+            <span class="result-section-label">Generated Code</span>
+            <button class="result-copy-btn" id="copy-code-btn">Copy</button>
+          </div>
+          <pre id="result-code" class="result-code-block"></pre>
+        </div>
+        <div class="result-section">
+          <div class="result-section-header">
+            <span class="result-section-label">Docstring</span>
+            <button class="result-copy-btn" id="copy-doc-btn">Copy</button>
+          </div>
+          <pre id="result-docstring" class="result-code-block"></pre>
+        </div>
+        <div class="result-section">
+          <div class="result-section-header">
+            <span class="result-section-label">Output Schema</span>
+          </div>
+          <pre id="result-schema" class="result-code-block"></pre>
+        </div>
+      </div>
+    </aside>  </div>
 
   <!-- WARNING MODAL -->
   <div id="modal-overlay" class="hidden">

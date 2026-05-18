@@ -784,6 +784,9 @@ async function runCell(node, upstreamSchema) {
 
   setNodeStatus(node.id, 'running');
 
+  /* 실행 시작 시 해당 셀의 Result 탭을 스트리밍 모드로 자동 오픈 */
+  if (typeof openResultTabStreaming === 'function') openResultTabStreaming(node.id);
+
   try {
     const resp = await fetch(url + '/cell/run', {
       method:  'POST',
@@ -824,7 +827,15 @@ async function runCell(node, upstreamSchema) {
           setNodeStatus(node.id, st);
           if (st === 'done') {
             const n = state.nodes.find(x => x.id === node.id);
-            if (n) n.outputSchema = payload.output_schema || {};
+            if (n) {
+              n.outputSchema = payload.output_schema || {};
+              n.result = {
+                code:          payload.code          || '',
+                docstring:     payload.docstring     || '',
+                input_schema:  payload.input_schema  || {},
+                output_schema: payload.output_schema || {},
+              };
+            }
           }
           return st;
         }
@@ -846,14 +857,25 @@ async function runCell(node, upstreamSchema) {
   return 'done';
 }
 
-/* SSE 이벤트 → 로그 패널 출력 */
+/* SSE 이벤트 → 로그 패널 출력 + Result 탭 실시간 업데이트 */
 function handleSseEvent(nodeId, eventName, payload) {
   if (eventName === 'stage_start') {
     appendRunLog('[' + nodeId + '] ▶ ' + payload.stage);
+    if (typeof streamResultTab === 'function') {
+      streamResultTab(nodeId, { stage: payload.stage });
+    }
   } else if (eventName === 'log' && payload.logs) {
     payload.logs.forEach(l => appendRunLog(l));
   } else if (eventName === 'result') {
     appendRunLog('[' + nodeId + '] ' + (payload.status === 'done' ? '✔ done' : '✖ failed'));
+    /* 완료 시 Result 탭에 최종 결과 반영 */
+    if (payload.status === 'done' && typeof streamResultTab === 'function') {
+      streamResultTab(nodeId, {
+        code:          payload.code      || '',
+        docstring:     payload.docstring || '',
+        output_schema: payload.output_schema || {},
+      });
+    }
   }
 }
 
@@ -1044,6 +1066,16 @@ function setNodeStatus(id, status) {
   if (state.selectedNode === id)        el.classList.add('selected');
   else if (state.selectedNodes.has(id)) el.classList.add('multi-selected');
 }
+
+/* done 셀 더블클릭 → Result 탭 열기 */
+document.getElementById('canvas').addEventListener('click', e => {
+  const nodeEl = e.target.closest('.cell-node');
+  if (!nodeEl) return;
+  const id = parseInt(nodeEl.id.replace('node-', ''), 10);
+  const node = state.nodes.find(n => n.id === id);
+  /* 클릭 시 Inspector 열기 — done이면 Result 탭, 아니면 Config 탭 */
+  if (typeof openInspector === 'function') openInspector(id);
+});
 /* ─────────────────────────────────────────────────
    INIT I/O CELLS
    ───────────────────────────────────────────────── */

@@ -20,7 +20,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated, TypedDict
 
@@ -379,18 +378,12 @@ def edge_after_execute(state: CellState) -> str:
 
 async def node_human_review(state: CellState) -> dict:
     """
-    실행 검증 직후 interrupt() 를 호출하여 그래프를 일시정지한다.
-    Resume 전 update_state() 로 generated_code 를 교체할 수 있다.
+    코드 검증 완료 후 wrap 단계로 바로 진행한다.
+    결과는 finalize 이후 프론트엔드 Result 탭에서 확인 가능하다.
     """
-    interrupt({
-        "cell_id": state["cell_id"],
-        "stage": "human_review",
-        "code": state["generated_code"],
-        "message": "코드를 확인하세요. 수정 후 Resume하거나 그대로 Run을 누르세요.",
-    })
     return {
         "stage": "human_review",
-        "stream_log": ["[human_review] paused — waiting for user"],
+        "stream_log": [f"[human_review] code verified ({len(state.get('generated_code', ''))} chars) — proceeding to wrap"],
     }
 
 
@@ -515,21 +508,19 @@ async def _stream_run(
             if logs:
                 yield _sse("log", {"logs": logs})
 
-            if event.get("name") == "human_review":
-                yield _sse("paused", {
-                    "stage": "human_review",
-                    "code": output.get("generated_code", ""),
-                })
-
             if output.get("status") in ("done", "failed"):
+                # on_chain_end의 output은 노드가 새로 반환한 필드만 포함한다.
+                # wrapped_code, docstring 등 누적 state 필드는 체크포인트에서 직접 읽는다.
+                snapshot = _compiled.get_state(config)
+                sv = snapshot.values if snapshot else {}
                 yield _sse("result", {
-                    "cell_id": output.get("cell_id", ""),
+                    "cell_id": sv.get("cell_id", output.get("cell_id", "")),
                     "status": output["status"],
-                    "code": output.get("wrapped_code", ""),
-                    "docstring": output.get("docstring", ""),
-                    "input_schema": output.get("input_schema", {}),
-                    "output_schema": output.get("output_schema", {}),
-                    "logs": output.get("stream_log", []),
+                    "code": sv.get("wrapped_code", ""),
+                    "docstring": sv.get("docstring", ""),
+                    "input_schema": sv.get("input_schema", {}),
+                    "output_schema": sv.get("output_schema", {}),
+                    "logs": sv.get("stream_log", []),
                 })
     yield _sse("done", {})
 
