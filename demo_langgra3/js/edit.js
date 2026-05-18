@@ -39,6 +39,17 @@ function hideCtxMenu() {
 
 document.addEventListener('mousedown', e => {
   if (!ctxMenu.contains(e.target)) hideCtxMenu();
+  // Close error panel on outside click
+  const errorPanel = document.getElementById('error-panel');
+  const statusBtn  = document.getElementById('status-validity');
+  if (
+    errorPanel &&
+    errorPanel.classList.contains('open') &&
+    !errorPanel.contains(e.target) &&
+    !statusBtn?.contains(e.target)
+  ) {
+    errorPanel.classList.remove('open');
+  }
 });
 
 document.addEventListener('keydown', e => {
@@ -737,6 +748,7 @@ document.addEventListener('keydown', e => {
       // Multi-source connecting mode: all selected nodes become connecting-source
       state.connectingFromMulti = new Set(multiIds);
       state.connectingFrom = null;
+      state.selectedNodes.clear();
       multiIds.forEach(nid => {
         const el = document.getElementById(`node-${nid}`);
         if (el) { el.classList.remove('multi-selected'); el.classList.add('connecting-source'); }
@@ -746,8 +758,10 @@ document.addEventListener('keydown', e => {
     } else if (singleId !== null) {
       // Single-source connecting mode
       state.connectingFrom = singleId;
-      document.getElementById(`node-${singleId}`)?.classList.add('connecting-source');
+      const singleEl = document.getElementById(`node-${singleId}`);
+      if (singleEl) { singleEl.classList.remove('multi-selected'); singleEl.classList.add('connecting-source'); }
       statusValid.textContent = '● Click another cell to connect...';
+      statusValid.className = 'running';
       statusValid.className = 'running';
     }
     return;

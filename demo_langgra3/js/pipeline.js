@@ -720,50 +720,86 @@ function loadPipeline(data) {
     hint.classList.add('hidden');
   }
 
-  closeInspector();
-  drawEdges();
+  if (typeof closeInspector === 'function') closeInspector();
   validatePipeline();
 }
 
 /* ─────────────────────────────────────────────────
    RUN / STOP
    ───────────────────────────────────────────────── */
+let _runTimeouts = [];
+
 btnRun.addEventListener('click', () => {
   const { canRun, errors } = validatePipeline();
   if (!canRun) {
-    const body = `<ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+    const body = '<ul>' + errors.map(e => '<li>' + e + '</li>').join('') + '</ul>';
     showModal('Cannot Run Pipeline', body);
     return;
   }
 
-  state.running = true;
-  btnRun.disabled = true;
+  _runTimeouts.forEach(t => clearTimeout(t));
+  _runTimeouts = [];
+  state.nodes.forEach(n => setNodeStatus(n.id, 'pending'));
+
+  // Kahn's topological sort
+  const successors   = {};
+  const predecessors = {};
+  state.nodes.forEach(n => { successors[n.id] = []; predecessors[n.id] = []; });
+  state.edges.forEach(e => {
+    if (successors[e.from])   successors[e.from].push(e.to);
+    if (predecessors[e.to])   predecessors[e.to].push(e.from);
+  });
+  const inDeg = {};
+  state.nodes.forEach(n => inDeg[n.id] = predecessors[n.id].length);
+  const queue = state.nodes.filter(n => inDeg[n.id] === 0).map(n => n.id);
+  const order = [];
+  while (queue.length) {
+    const cur = queue.shift();
+    order.push(cur);
+    (successors[cur] || []).forEach(nxt => {
+      inDeg[nxt]--;
+      if (inDeg[nxt] === 0) queue.push(nxt);
+    });
+  }
+  state.nodes.forEach(n => { if (!order.includes(n.id)) order.push(n.id); });
+
+  state.running    = true;
+  btnRun.disabled  = true;
   btnStop.disabled = false;
   validatePipeline();
 
-  const sorted = [...state.nodes].sort((a, b) => a.y - b.y);
   let i = 0;
   function runNext() {
-    if (!state.running || i >= sorted.length) { finishRun(); return; }
-    const node = sorted[i++];
-    setNodeStatus(node.id, 'running');
-    setTimeout(() => {
+    if (!state.running || i >= order.length) { finishRun(); return; }
+    const nodeId = order[i++];
+    setNodeStatus(nodeId, 'running');
+    const duration = 900 + Math.random() * 700;
+    const t1 = setTimeout(() => {
       if (!state.running) return;
-      setNodeStatus(node.id, 'done');
-      setTimeout(runNext, 200);
-    }, 1200 + Math.random() * 800);
+      setNodeStatus(nodeId, 'done');
+      const t2 = setTimeout(runNext, 150);
+      _runTimeouts.push(t2);
+    }, duration);
+    _runTimeouts.push(t1);
   }
   runNext();
 });
 
 btnStop.addEventListener('click', () => {
   state.running = false;
-  state.nodes.forEach(n => { if (n.status === 'running') setNodeStatus(n.id, 'pending'); });
-  finishRun();
+  _runTimeouts.forEach(t => clearTimeout(t));
+  _runTimeouts = [];
+  state.nodes.forEach(n => {
+    if (n.status === 'running') setNodeStatus(n.id, 'stopped');
+  });
+  btnRun.disabled  = false;
+  btnStop.disabled = true;
+  validatePipeline();
 });
 
 function finishRun() {
-  state.running = false;
+  state.running    = false;
+  btnRun.disabled  = false;
   btnStop.disabled = true;
   validatePipeline();
 }
@@ -772,10 +808,11 @@ function setNodeStatus(id, status) {
   const node = state.nodes.find(n => n.id === id);
   if (!node) return;
   node.status = status;
-  const el = document.getElementById(`node-${id}`);
+  const el = document.getElementById('node-' + id);
   if (!el) return;
-  el.className = `cell-node ${status}`;
-  if (state.selectedNode === id) el.classList.add('selected');
+  el.className = 'cell-node ' + status;
+  if (state.selectedNode === id)        el.classList.add('selected');
+  else if (state.selectedNodes.has(id)) el.classList.add('multi-selected');
 }
 
 /* ─────────────────────────────────────────────────

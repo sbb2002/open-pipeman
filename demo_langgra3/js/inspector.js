@@ -142,6 +142,7 @@ document.getElementById('apply-btn').addEventListener('click', () => {
     closeInspector();
   }, 800);
 });
+
 /* ── VALIDATION ───────────────────────────────── */
 function validatePipeline() {
   const errors = [];
@@ -149,20 +150,28 @@ function validatePipeline() {
   // Check all nodes are configured
   state.nodes.forEach(node => {
     const missing = [];
-    if (!node.name)  missing.push('name');
-    if (!node.model) missing.push('model');
-    if (!node.prompt) missing.push('system prompt');
-    // Input cell: only needs inputType/inputDesc
+    const isIO = node.type === 'input' || node.type === 'output';
+
+    if (!node.name) missing.push('name');
+
+    // model, prompt는 일반 셀(cell)에만 필수
+    if (!isIO) {
+      if (!node.model)  missing.push('model');
+      if (!node.prompt) missing.push('system prompt');
+    }
+
+    // Input cell: inputType/inputDesc만 필요
     if (node.type !== 'output') {
       if (!node.inputType) missing.push('input type');
       if (!node.inputDesc) missing.push('input description');
     }
-    // Output cell: only needs outputType/outputDesc
+    // Output cell: outputType/outputDesc만 필요
     if (node.type !== 'input') {
       if (!node.outputType) missing.push('output type');
       if (!node.outputDesc) missing.push('output description');
     }
-    if (missing.length) errors.push(`"${node.name}": missing ${missing.join(', ')}`);
+
+    if (missing.length) errors.push(`"${node.name || `Cell ${node.id}`}": missing ${missing.join(', ')}`);
   });
 
   // Check edges
@@ -176,18 +185,50 @@ function validatePipeline() {
   const canRun = state.nodes.length > 0 && errors.length === 0;
   btnRun.disabled = !canRun || state.running;
 
+  // ── Error panel: populate list ──────────────────
+  const errorPanel     = document.getElementById('error-panel');
+  const errorPanelList = document.getElementById('error-panel-list');
+  if (errorPanelList) {
+    errorPanelList.innerHTML = '';
+    errors.forEach(msg => {
+      const li = document.createElement('li');
+      li.textContent = msg;
+      errorPanelList.appendChild(li);
+    });
+  }
+  // Auto-close panel when errors are cleared
+  if (errors.length === 0 && errorPanel) {
+    errorPanel.classList.remove('open');
+  }
+
+  // ── Status bar: preserve base class, toggle state classes ──
+  statusValid.classList.remove('running', 'error');
   if (state.running) {
     statusValid.textContent = '● Running...';
-    statusValid.className = 'running';
+    statusValid.classList.add('running');
   } else if (errors.length === 0 && state.nodes.length > 0) {
     statusValid.textContent = `● Ready — ${state.nodes.length} cell${state.nodes.length > 1 ? 's' : ''}`;
-    statusValid.className = '';
   } else if (state.nodes.length === 0) {
     statusValid.textContent = '● No cells';
-    statusValid.className = '';
   } else {
     statusValid.textContent = `● ${errors.length} error${errors.length > 1 ? 's' : ''}`;
-    statusValid.className = 'error';
+    statusValid.classList.add('error');
+  }
+
+  // ── Attach handlers once ────────────────────────
+  if (!statusValid._errorPanelBound) {
+    statusValid._errorPanelBound = true;
+    statusValid.addEventListener('click', () => {
+      if (!statusValid.classList.contains('error')) return;
+      document.getElementById('error-panel')?.classList.toggle('open');
+    });
+  }
+  const epCloseBtn = document.getElementById('error-panel-close');
+  if (epCloseBtn && !epCloseBtn._bound) {
+    epCloseBtn._bound = true;
+    epCloseBtn.addEventListener('click', () => {
+      document.getElementById('error-panel')?.classList.remove('open');
+    });
   }
 
   return { canRun, errors };

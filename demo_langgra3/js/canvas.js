@@ -1,5 +1,6 @@
 /* ── PALETTE DRAG ─────────────────────────────── */
 let dragType = null;
+let _nodeDragMoved = false;
 
 document.querySelectorAll('.palette-item').forEach(item => {
   item.addEventListener('dragstart', e => {
@@ -55,58 +56,89 @@ function createNode(type, x, y) {
 function renderNode(node) {
   const el = document.createElement('div');
   el.className = 'cell-node pending';
-  el.id = `node-${node.id}`;
+  el.id = 'node-' + node.id;
   el.style.left = node.x + 'px';
   el.style.top  = node.y + 'px';
 
   const showIN  = node.type !== 'output';
   const showOUT = node.type !== 'input';
-  el.innerHTML = `
-    <div class="cell-status-dot"></div>
-    <div class="cell-node-type">${node.type}</div>
-    <div class="cell-node-name" id="nn-${node.id}">${node.name}</div>
-    <div class="cell-node-io">
-      ${showIN  ? `<div class="cell-io-row">
-        <span class="cell-io-label io-label-text">IN</span>
-        <span class="cell-io-type" id="ni-${node.id}">${node.inputType || '—'}</span>
-      </div>` : ''}
-      ${showOUT ? `<div class="cell-io-row">
-        <span class="cell-io-label io-label-text">OUT</span>
-        <span class="cell-io-type output" id="no-${node.id}">${node.outputType || '—'}</span>
-      </div>` : ''}
-    </div>
-  `;
+
+  // status dot
+  const dot = document.createElement('div');
+  dot.className = 'cell-status-dot';
+  el.appendChild(dot);
+
+  // type label
+  const typeEl = document.createElement('div');
+  typeEl.className = 'cell-node-type';
+  typeEl.textContent = node.type;
+  el.appendChild(typeEl);
+
+  // name
+  const nameEl = document.createElement('div');
+  nameEl.className = 'cell-node-name';
+  nameEl.id = 'nn-' + node.id;
+  nameEl.textContent = node.name;
+  el.appendChild(nameEl);
+
+  // I/O rows
+  const ioWrap = document.createElement('div');
+  ioWrap.className = 'cell-node-io';
+
+  if (showIN) {
+    const row = document.createElement('div');
+    row.className = 'cell-io-row';
+    const lbl = document.createElement('span');
+    lbl.className = 'cell-io-label io-label-text';
+    lbl.textContent = 'IN';
+    const typ = document.createElement('span');
+    typ.className = 'cell-io-type';
+    typ.id = 'ni-' + node.id;
+    typ.textContent = node.inputType || '—';
+    row.appendChild(lbl);
+    row.appendChild(typ);
+    ioWrap.appendChild(row);
+  }
+
+  if (showOUT) {
+    const row = document.createElement('div');
+    row.className = 'cell-io-row';
+    const lbl = document.createElement('span');
+    lbl.className = 'cell-io-label io-label-text';
+    lbl.textContent = 'OUT';
+    const typ = document.createElement('span');
+    typ.className = 'cell-io-type output';
+    typ.id = 'no-' + node.id;
+    typ.textContent = node.outputType || '—';
+    row.appendChild(lbl);
+    row.appendChild(typ);
+    ioWrap.appendChild(row);
+  }
+
+  el.appendChild(ioWrap);
 
   // Click: select / connect
   el.addEventListener('click', e => {
     e.stopPropagation();
-    // Suppress click that fires immediately after a drag move
     if (_nodeDragMoved) { _nodeDragMoved = false; return; }
-    if (e.ctrlKey || e.metaKey) {
-      handleCtrlClick(node.id);
-      return;
-    }
+    if (e.ctrlKey || e.metaKey) { handleCtrlClick(node.id); return; }
     handleNodeClick(node.id);
   });
 
-  // Drag to move (supports multi-select + ctrl-drag copy)
+  // Drag to move
   el.addEventListener('mousedown', e => {
-    if (state.connectingFrom !== null) return;
+    if (state.connectingFrom !== null || state.connectingFromMulti !== null) return;
     if (e.button !== 0) return;
     e.preventDefault();
     const rect = el.getBoundingClientRect();
-
-    // Determine which nodes to drag
     const dragIds = state.selectedNodes.size > 0 && state.selectedNodes.has(node.id)
       ? [...state.selectedNodes]
       : [node.id];
-
     const startPositions = {};
     dragIds.forEach(nid => {
       const n = state.nodes.find(x => x.id === nid);
       if (n) startPositions[nid] = { x: n.x, y: n.y };
     });
-
     state.dragging = {
       nodeId: node.id,
       offsetX: e.clientX - rect.left,
@@ -123,6 +155,8 @@ function renderNode(node) {
   attachTooltipListeners(el, node);
   canvas.appendChild(el);
 }
+
+
 /* ── GHOST ELEMENTS (Ctrl+drag preview) ──────── */
 const ghostLayer = document.createElement('div');
 ghostLayer.id = 'ghost-layer';
@@ -131,7 +165,7 @@ document.getElementById('canvas').appendChild(ghostLayer);
 function buildGhosts(dragIds, startPositions) {
   ghostLayer.innerHTML = '';
   dragIds.forEach(nid => {
-    const src = document.getElementById(`node-${nid}`);
+    const src = document.getElementById('node-' + nid);
     if (!src) return;
     const sp = startPositions[nid];
     const g = src.cloneNode(true);
@@ -160,37 +194,6 @@ function clearGhosts() {
   ghostLayer.innerHTML = '';
   ghostLayer.style.display = 'none';
 }
-/* ── DRAG NODES ───────────────────────────────── */
-let _nodeDragMoved = false; // suppress click after a real node drag
-
-document.addEventListener('mousemove', e => {
-  if (!state.dragging) return;
-  const dx = (e.clientX - state.dragging.startX) / state.zoom;
-  const dy = (e.clientY - state.dragging.startY) / state.zoom;
-  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) state.dragging.hasMoved = true;
-
-  if (state.dragging.isCtrlDrag) {
-    // Ctrl+drag: originals stay, ghosts follow mouse
-    if (state.dragging.hasMoved) {
-      if (ghostLayer.children.length === 0) {
-        buildGhosts(state.dragging.dragIds, state.dragging.startPositions);
-      }
-      moveGhosts(state.dragging.dragIds, state.dragging.startPositions, dx, dy);
-    }
-  } else {
-    // Normal drag: move originals
-    state.dragging.dragIds.forEach(nid => {
-      const n = state.nodes.find(x => x.id === nid);
-      if (!n) return;
-      const sp = state.dragging.startPositions[nid];
-      n.x = Math.max(0, sp.x + dx);
-      n.y = Math.max(0, sp.y + dy);
-      const el = document.getElementById(`node-${nid}`);
-      if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
-    });
-    drawEdges();
-  }
-});
 
 document.addEventListener('mouseup', e => {
   if (!state.dragging) return;
@@ -234,12 +237,17 @@ function handleNodeClick(id) {
 
       if (toNode.y <= fromNode.y) return; // skip invalid direction silently
 
-      // Remove duplicate edge
-      state.edges = state.edges.filter(e => !(e.from === from && e.to === id));
+      // Toggle: if edge already exists, remove it (disconnect)
+      const existingEdge = state.edges.find(e => e.from === from && e.to === id);
+      if (existingEdge) {
+        pushHistory();
+        state.edges = state.edges.filter(e => e !== existingEdge);
+        drawEdges();
+        return;
+      }
 
       if (fromNode.outputType) {
         const hasExistingInput = !!(toNode.inputType || toNode.inputDesc);
-        const isSame = toNode.inputType === fromNode.outputType && toNode.inputDesc === fromNode.outputDesc;
         if (!hasExistingInput) {
           applyInputCopy(fromNode, toNode);
         }
@@ -278,6 +286,16 @@ function handleNodeClick(id) {
     document.querySelectorAll('.cell-node').forEach(el => el.classList.remove('connecting-source'));
 
     if (from === to) { validatePipeline(); return; }
+
+    // 이미 from→to 연결이 존재하면 클릭 시 해제
+    const existingEdge = state.edges.find(e => e.from === from && e.to === to);
+    if (existingEdge) {
+      pushHistory();
+      state.edges = state.edges.filter(e => e !== existingEdge);
+      drawEdges();
+      validatePipeline();
+      return;
+    }
 
     // No reverse or same-level connections
     const fromNode = state.nodes.find(n => n.id === from);
@@ -383,6 +401,34 @@ document.getElementById('canvas-wrap').addEventListener('mousedown', e => {
   lassoRect.style.top    = startY * state.zoom + 'px';
   lassoRect.style.width  = '0px';
   lassoRect.style.height = '0px';
+});
+
+document.addEventListener('mousemove', e => {
+  if (!state.dragging) return;
+  const d = state.dragging;
+  const dx = (e.clientX - d.startX) / state.zoom;
+  const dy = (e.clientY - d.startY) / state.zoom;
+
+  if (!d.hasMoved && (Math.abs(e.clientX - d.startX) > 3 || Math.abs(e.clientY - d.startY) > 3)) {
+    d.hasMoved = true;
+    if (d.isCtrlDrag) buildGhosts(d.dragIds, d.startPositions);
+  }
+  if (!d.hasMoved) return;
+
+  if (d.isCtrlDrag) {
+    moveGhosts(d.dragIds, d.startPositions, dx, dy);
+  } else {
+    d.dragIds.forEach(nid => {
+      const n = state.nodes.find(x => x.id === nid);
+      if (!n) return;
+      const sp = d.startPositions[nid];
+      n.x = Math.max(0, sp.x + dx);
+      n.y = Math.max(0, sp.y + dy);
+      const el = document.getElementById('node-' + nid);
+      if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
+    });
+    drawEdges();
+  }
 });
 
 document.addEventListener('mousemove', e => {
@@ -593,4 +639,5 @@ function resizeCanvas() {
   drawEdges();
 }
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+// DOM 레이아웃이 완전히 완성된 후 실행하여 edgeCanvas 크기를 정확히 측정
+requestAnimationFrame(resizeCanvas);

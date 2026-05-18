@@ -373,6 +373,7 @@
 #status-validity.running { color: var(--blue); }
 
 /* status-validity가 error일 때 클릭 가능한 버튼처럼 */
+/* status-validity가 error일 때 클릭 가능한 버튼처럼 */
 .status-validity-btn {
   background: none;
   border: none;
@@ -382,6 +383,13 @@
   letter-spacing: 0.06em;
   color: inherit;
   cursor: default;
+  outline: none;
+}
+.status-validity-btn:focus,
+.status-validity-btn:focus-visible {
+  background: none;
+  outline: none;
+  box-shadow: none;
 }
 .status-validity-btn.error {
   cursor: pointer;
@@ -389,7 +397,6 @@
   text-underline-offset: 3px;
 }
 .status-validity-btn.error:hover { opacity: 0.8; }
-
 /* ── ERROR SLIDE PANEL ────────────────────────── */
 #error-panel {
   position: absolute;
