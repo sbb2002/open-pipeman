@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open-Pipeman Patch Notes</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #64748b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --accent: #facc15;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--secondary);
+            border-radius: 8px;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            background-color: #e2e8f0;
+        }
+
+        .tab-btn.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Content Area */
+        .patch-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .patch-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        h2 { color: var(--primary); border-left: 5px solid var(--primary); padding-left: 15px; }
+        h3 { color: var(--secondary); margin-top: 30px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+
+        /* Tables */
+        .table-container { overflow-x: auto; margin: 15px 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        th { background-color: #f1f5f9; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+
+        /* Status & Badge */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .badge-ver { background: #dbeafe; color: #1e40af; }
+        .badge-fail { background: #fee2e2; color: #991b1b; }
+
+        /* Issue & Root Cause Section */
+        .issue-box {
+            background-color: #fff7ed;
+            border-left: 4px solid #f97316;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .todo-list {
+            background-color: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+        }
+
+        .todo-list ul { margin: 0; padding-left: 20px; }
+
+        code {
+            background: #f1f5f9;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #e11d48;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🛠 Patch Notes</h1>
+        <p>Open-Pipeman 프로젝트 개발 로그</p>
+    </header>
+
+    <div class="tabs" id="patchTabs">
+        <button class="tab-btn active" onclick="showPatch('260518')">260518</button>
+        <button class="tab-btn" onclick="showPatch('260515')">260515</button>
+        <button class="tab-btn" onclick="showPatch('260514')">260514</button>
+        <button class="tab-btn" onclick="showPatch('todo')">📌 TODO</button>
+    </div>
+
+    <div id="260518" class="patch-content active">
+        <div class="card">
+            <h2>260518: 파이프라인 고도화 및 SSE 스트리밍</h2>
+            
+            <h3>Session 1. 셀 상태 시각화 (CSS)</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>파일명</th><th>버전</th><th>수정 내역</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><code>css/cell.css</code></td>
+                            <td><span class="badge badge-ver">v1</span></td>
+                            <td>Stopped 상태 노란색(#facc15) dot 및 테두리 적용, 2초 주기 pulse 애니메이션 추가</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Session 2. 우클릭 메뉴 기능 확장</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>파일명</th><th>버전</th><th>내용</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>js/edit.js</code></td><td>v1</td><td>우클릭 메뉴: '이 셀만 Run', '이 셀부터 Run', 'Stop' 추가</td></tr>
+                        <tr><td><code>js/pipeline.js</code></td><td>v1</td><td>Run 로직 리팩토링 (<code>runFromNode</code> 추출)</td></tr>
+                        <tr><td><code>modify_manual.md</code></td><td>v1</td><td>앵커 추정 금지 규칙 명시</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Session 3. LangGraph 기반 파이프라인 검증</h3>
+            <p>백엔드 AsyncAnthropic 전환 및 SSE 스트리밍 구현 완료.</p>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>파일명</th><th>버전</th><th>주요 내용</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>backend.py</code></td><td>v1~v6</td><td>Async 전환, Ollama 분기, AttributeError 방지 타입 가드, 누적 State 읽기(Result 누락 해소)</td></tr>
+                        <tr><td><code>js/pipeline.js</code></td><td>v1~v3</td><td>SSE 스트리밍 연동, 실시간 Result 탭 업데이트 구현</td></tr>
+                        <tr><td><code>js/inspector.js</code></td><td>v1~v3</td><td>Ollama 모델 설정 복원, Config/Result 탭 전환 및 스트리밍 표시 로직</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="issue-box">
+                <h4>⚠️ 패치 도구 발생 문제 (S3)</h4>
+                <p>앵커 중복 및 위치 불일치로 인한 14건의 이슈 발생. <strong>근본 원인:</strong> 앵커 추정 작성, 삽입/교체 혼동, 줄 번호 Drift 미추적.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="260515" class="patch-content">
+        <div class="card">
+            <h2>260515: 연결 모드 UX 개선</h2>
+            <ul>
+                <li>셀 연결모드 중 이미 연결한 셀을 한번 더 클릭 시 해제하는 기능 추가</li>
+            </ul>
+
+            <h3>Session 1 & 2. Run/Stop 및 버그 수정</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>파일</th><th>버전</th><th>내용</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>js/canvas.js</code></td><td>v2</td><td>멀티 연결모드에서 이미 연결된 엣지 클릭 시 토글(해제)로 변경</td></tr>
+                        <tr><td><code>js/pipeline.js</code></td><td>v1</td><td>Kahn's 알고리즘 기반 순차 실행 및 타이머 기반 Stop 구현</td></tr>
+                        <tr><td><code>js/inspector.js</code></td><td>v1</td><td>INPUT/OUTPUT 셀 필수 검사 제외 및 폴백 이름 추가</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="260514" class="patch-content">
+        <div class="card">
+            <h2>260514: 복수 선택 및 토큰 최적화</h2>
+            <ul>
+                <li>드래그로 셀 복수 선택 기능 추가</li>
+                <li>J키를 이용한 연결모드(파란 테두리) 진입 기능</li>
+                <li><strong>Token 최적화:</strong> <code>structure.md</code>, <code>modify_manual.md</code> 도입으로 필요한 파일만 참고하도록 개선</li>
+            </ul>
+
+            <div class="issue-box" style="border-color: var(--danger); background-color: #fef2f2;">
+                <h4 style="color: var(--danger);">🛑 Session 3 패치 실패</h4>
+                <p>작업물이 완전히 꼬임. Claude의 줄넘버 카운팅 오류 추측. <strong>대응:</strong> 수정 매뉴얼 강화 (JSON Form에 앞 10글자 대조 추가 제안)</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="todo" class="patch-content">
+        <div class="card">
+            <h2>📌 향후 로드맵 (TODO)</h2>
+            <div class="todo-list">
+                <ul>
+                    <li><strong>의존성 자동 관리:</strong> 시작 셀에서 필요한 라이브러리/버전을 취합하여 통일 및 환경설정 문제 방지</li>
+                    <li><strong>가이드라인 정립:</strong> 데이터 흐름에 따른 가공 과정을 직관적으로 이해할 수 있는 셀 배치 방법론 정의</li>
+                    <li><strong>UX 제약:</strong> OUTPUT CELL은 J(Join) 모드 진입 차단</li>
+                    <li><strong>코드 조립:</strong> 마지막 Output 셀에서 전체 코드 조립 로직 구현</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showPatch(id) {
+        // Hide all content
+        const contents = document.querySelectorAll('.patch-content');
+        contents.forEach(content => content.classList.remove('active'));
+
+        // Deactivate all buttons
+        const buttons = document.querySelectorAll('.tab-btn');
+        buttons.forEach(btn => btn.classList.remove('active'));
+
+        // Show selected content
+        document.getElementById(id).classList.add('active');
+
+        // Activate clicked button
+        event.currentTarget.classList.add('active');
+    }
+</script>
+
+</body>
+</html>

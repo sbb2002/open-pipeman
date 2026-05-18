@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시스템 에러 분석 보고서</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #d9534f;
+            border-bottom: 2px solid #d9534f;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        h2 {
+            color: #2c3e50;
+            font-size: 1.3em;
+            margin-top: 0;
+        }
+        .status-badge {
+            display: inline-block;
+            background-color: #d9534f;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .code-block {
+            background-color: #2d3748;
+            color: #f7fafc;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .solutions li {
+            list-style-type: none;
+            position: relative;
+            padding-left: 25px;
+        }
+        .solutions li::before {
+            content: "💡";
+            position: absolute;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>🚨 시스템 에러 요약 보고서</h1>
+        <p><strong>발생 위치:</strong> 백엔드 연동 중인 LangGraph 기반 애플리케이션 (Node: <code>generate</code>)</p>
+        <p><strong>현재 상태:</strong> <span class="status-badge">인증 실패로 인한 스트리밍 중단</span></p>
+    </div>
+
+    <div class="card">
+        <h2>1. 현상 파악 (무슨 일이 일어났는가?)</h2>
+        <ul>
+            <li><strong>프론트엔드:</strong> <code>POST /cell/run</code> 요청 중 <code>net::ERR_INCOMPLETE_CHUNKED_ENCODING 200 (OK)</code> 에러 발생 후 네트워크 통신 끊김.</li>
+            <li><strong>백엔드:</strong> 응답을 쪼개서 보내는(Streaming) 도중 데이터 처리가 비정상적으로 중단되어 ASGI 애플리케이션 Exception 터짐.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>2. 진짜 원인 (Root Cause)</h2>
+        <p>백엔드 내부의 <span class="highlight">Anthropic(Claude) API 호출 라이브러리가 API 키를 찾지 못해</span> 에러가 발생했습니다.</p>
+        <div class="code-block">
+            TypeError: "Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set..."
+        </div>
+        <p style="margin-bottom: 0;">LangGraph가 <code>node_generate</code> 노드에서 Claude 모델을 실행하려는 순간, 필수 인증 정보(API Key)가 누락되어 전체 스트리밍 파이프라인이 붕괴되었습니다.</p>
+    </div>
+
+    <div class="card">
+        <h2>3. 해결 방법 (Action Item)</h2>
+        <ul class="solutions">
+            <li><strong>방법 A (.env 설정):</strong> 프로젝트 루트의 <code>.env</code> 파일에 <code>ANTHROPIC_API_KEY=내_API_키</code>가 올바르게 설정되었는지 확인하고, 코드 상단에서 <code>load_dotenv()</code>로 불러오고 있는지 체크합니다.</li>
+            <li><strong>방법 B (터미널 주입):</strong> 백엔드 서버를 켜기 전 터미널 환경 변수로 키를 직접 등록한 후 서버를 재시작합니다.
+                <br><small style="color:#7f8c8d;">(예: PowerShell의 경우 <code>$env:ANTHROPIC_API_KEY="키_값"</code> 입력 후 uvicorn 실행)</small>
+            </li>
+            <li><strong>방법 C (코드 명시):</strong> <code>backend.py</code> 내에서 Anthropic 객체를 초기화할 때 <code>Anthropic(api_key="키_값")</code> 형태로 하드코딩하여 테스트합니다. <small style="color:#e74c3c;">(⚠️ 깃허브 업로드 시 주의)</small></li>
+        </ul>
+    </div>
+
+</body>
+</html>
