@@ -1,3 +1,21 @@
+/* ── TOOL MODE ───────────────────────────────── */
+let _toolMode = 'cursor';
+
+(function initToolTray() {
+  const btnCursor  = document.getElementById('tool-cursor');
+  const btnPan     = document.getElementById('tool-pan');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  if (!btnCursor || !btnPan) return;
+  function setToolMode(mode) {
+    _toolMode = mode;
+    btnCursor.classList.toggle('active', mode === 'cursor');
+    btnPan.classList.toggle('active',    mode === 'pan');
+    canvasWrap.style.cursor = mode === 'pan' ? 'grab' : '';
+  }
+  btnCursor.addEventListener('click', () => setToolMode('cursor'));
+  btnPan.addEventListener('click',    () => setToolMode('pan'));
+})();
+
 /* ── PALETTE DRAG ─────────────────────────────── */
 let dragType = null;
 let _nodeDragMoved = false;
@@ -12,9 +30,8 @@ document.querySelectorAll('.palette-item').forEach(item => {
 function handleDrop(e) {
   if (!dragType) return;
   const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  // canvas-wrap 기준 좌표를 zoom으로 나눠 canvas 내부 논리 좌표로 변환
-  const x = (e.clientX - wrap.left) / state.zoom - 90;
-  const y = (e.clientY - wrap.top)  / state.zoom - 40;
+  const x = (e.clientX - wrap.left - (state.panX || 0)) / state.zoom - 90;
+  const y = (e.clientY - wrap.top  - (state.panY || 0)) / state.zoom - 40;
   createNode(dragType, x, y);
   dragType = null;
 }
@@ -125,8 +142,9 @@ function renderNode(node) {
     handleNodeClick(node.id);
   });
 
-  // Drag to move
+  // Drag to move (disabled in pan mode)
   el.addEventListener('mousedown', e => {
+    if (_toolMode === 'pan') return;
     if (state.connectingFrom !== null || state.connectingFromMulti !== null) return;
     if (e.button !== 0) return;
     e.preventDefault();
@@ -382,23 +400,50 @@ document.getElementById('canvas-wrap').appendChild(lassoRect);
 
 let _lassoDidDrag = false; // suppress canvas click after a real lasso drag
 
-/* canvas-wrap mousedown: start lasso only when clicking on empty background */
+/* canvas-wrap mousedown: start lasso OR pan */
 document.getElementById('canvas-wrap').addEventListener('mousedown', e => {
   if (e.button !== 0) return;
+
+  /* ── PAN MODE ── */
+  if (_toolMode === 'pan') {
+    const canvasWrap = document.getElementById('canvas-wrap');
+    canvasWrap.style.cursor = 'grabbing';
+    const startX    = e.clientX;
+    const startY    = e.clientY;
+    const startPanX = state.panX || 0;
+    const startPanY = state.panY || 0;
+    const canvasEl  = document.getElementById('canvas');
+    function onPanMove(ev) {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      state.panX = startPanX + dx;
+      state.panY = startPanY + dy;
+      canvasEl.style.transform = 'translate(' + state.panX + 'px,' + state.panY + 'px)';
+      drawEdges();
+    }
+    function onPanUp() {
+      canvasWrap.style.cursor = 'grab';
+      document.removeEventListener('mousemove', onPanMove);
+      document.removeEventListener('mouseup',   onPanUp);
+    }
+    document.addEventListener('mousemove', onPanMove);
+    document.addEventListener('mouseup',   onPanUp);
+    return;
+  }
+
+  /* ── CURSOR MODE: lasso ── */
   if (state.connectingFrom !== null) return;
   if (state.dragging) return;
-  // Only trigger on true canvas background (not on a cell or inspector)
   const onCell = e.target.closest('.cell-node');
   if (onCell) return;
-  // Ignore if target is edge-canvas but a node drag is starting
-  const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  const startX = (e.clientX - wrap.left) / state.zoom;
-  const startY = (e.clientY - wrap.top)  / state.zoom;
+  const wrap   = document.getElementById('canvas-wrap').getBoundingClientRect();
+  const startX = (e.clientX - wrap.left - (state.panX || 0)) / state.zoom;
+  const startY = (e.clientY - wrap.top  - (state.panY || 0)) / state.zoom;
   state.boxSelect = { startX, startY, clientStartX: e.clientX, clientStartY: e.clientY };
 
   lassoRect.style.display = 'none';
-  lassoRect.style.left   = startX * state.zoom + 'px';
-  lassoRect.style.top    = startY * state.zoom + 'px';
+  lassoRect.style.left   = (startX * state.zoom + (state.panX || 0)) + 'px';
+  lassoRect.style.top    = (startY * state.zoom + (state.panY || 0)) + 'px';
   lassoRect.style.width  = '0px';
   lassoRect.style.height = '0px';
 });
@@ -434,8 +479,8 @@ document.addEventListener('mousemove', e => {
 document.addEventListener('mousemove', e => {
   if (!state.boxSelect) return;
   const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  const curX = (e.clientX - wrap.left) / state.zoom;
-  const curY = (e.clientY - wrap.top)  / state.zoom;
+  const curX = (e.clientX - wrap.left - (state.panX || 0)) / state.zoom;
+  const curY = (e.clientY - wrap.top  - (state.panY || 0)) / state.zoom;
   const { startX, startY } = state.boxSelect;
 
   const dx = e.clientX - state.boxSelect.clientStartX;
@@ -445,8 +490,8 @@ document.addEventListener('mousemove', e => {
     lassoRect.style.display = 'block';
   }
 
-  const lx = Math.min(startX, curX) * state.zoom;
-  const ly = Math.min(startY, curY) * state.zoom;
+  const lx = Math.min(startX, curX) * state.zoom + (state.panX || 0);
+  const ly = Math.min(startY, curY) * state.zoom + (state.panY || 0);
   const lw = Math.abs(curX - startX) * state.zoom;
   const lh = Math.abs(curY - startY) * state.zoom;
   lassoRect.style.left   = lx + 'px';
@@ -462,8 +507,8 @@ document.addEventListener('mouseup', e => {
   lassoRect.style.display = 'none';
 
   const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  const endX = (e.clientX - wrap.left) / state.zoom;
-  const endY = (e.clientY - wrap.top)  / state.zoom;
+  const endX = (e.clientX - wrap.left - (state.panX || 0)) / state.zoom;
+  const endY = (e.clientY - wrap.top  - (state.panY || 0)) / state.zoom;
 
   const dx = e.clientX - bs.clientStartX;
   const dy = e.clientY - bs.clientStartY;
@@ -524,8 +569,8 @@ canvas.addEventListener('click', e => {
   // Hit-test edges on left-click on canvas background
   if (e.target === canvas || e.target === edgeCanvas) {
     const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-    const cx = e.clientX - wrap.left;
-    const cy = e.clientY - wrap.top;
+    const cx = e.clientX - wrap.left - (state.panX || 0);
+    const cy = e.clientY - wrap.top  - (state.panY || 0);
     const hit = getEdgeAtPoint(cx, cy);
     if (hit) {
       clearSelection();
@@ -560,10 +605,12 @@ function drawEdges() {
     const fh = fromEl.offsetHeight;
     const tw = toEl.offsetWidth;
 
-    const x1 = (fromNode.x + fw / 2) * z;
-    const y1 = (fromNode.y + fh) * z;
-    const x2 = (toNode.x  + tw / 2) * z;
-    const y2 = (toNode.y) * z;
+    const px = state.panX || 0;
+    const py = state.panY || 0;
+    const x1 = (fromNode.x + fw / 2) * z + px;
+    const y1 = (fromNode.y + fh) * z + py;
+    const x2 = (toNode.x  + tw / 2) * z + px;
+    const y2 = (toNode.y) * z + py;
 
     const color     = edge.valid ? '#7ee8a2' : '#f87171';
     const isSelected = state.selectedEdge === edge;
