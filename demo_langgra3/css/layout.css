@@ -368,7 +368,7 @@
   letter-spacing: 0.06em;
 }
 
-#status-validity { color: var(--accent); }
+#status-validity { color: var(--text3); }
 #status-validity.error { color: var(--red); }
 #status-validity.running { color: var(--blue); }
 

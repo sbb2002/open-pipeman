@@ -602,10 +602,13 @@ function alignSameRowY(nodeId) {
 /* ── ZOOM ─────────────────────────────────────── */
 function applyTransform() {
   const canvasEl = document.getElementById('canvas');
+  const wrap = document.getElementById('canvas-wrap');
   const px = state.panX || 0;
   const py = state.panY || 0;
   canvasEl.style.transformOrigin = '0 0';
   canvasEl.style.transform = `translate(${px}px, ${py}px) scale(${state.zoom})`;
+  // 배경 패턴을 pan offset에 맞춰 이동 (64px 타일 기준 나머지 연산으로 seamless)
+  wrap.style.backgroundPosition = `${px % 64}px ${py % 64}px`;
   drawEdges();
 }
 
