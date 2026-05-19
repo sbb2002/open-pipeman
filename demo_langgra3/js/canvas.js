@@ -418,8 +418,7 @@ document.getElementById('canvas-wrap').addEventListener('mousedown', e => {
       const dy = ev.clientY - startY;
       state.panX = startPanX + dx;
       state.panY = startPanY + dy;
-      canvasEl.style.transform = 'translate(' + state.panX + 'px,' + state.panY + 'px)';
-      drawEdges();
+      applyTransform();
     }
     function onPanUp() {
       canvasWrap.style.cursor = 'grab';

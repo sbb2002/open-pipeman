@@ -57,9 +57,9 @@ document.addEventListener('keydown', e => {
 });
 
 /* Hit-test: is click point near a bezier curve edge? */
-function getEdgeAtPoint(px, py) {
-  // px, py는 canvas-wrap 기준 좌표 (zoom 미적용)
-  // drawEdges()와 동일하게 논리 좌표 * zoom으로 비교
+function getEdgeAtPoint(hitX, hitY) {
+  // hitX/Y는 pan 보정된 canvas-wrap 기준 좌표 (zoom 미적용)
+  // drawEdges()와 동일하게 논리 좌표 * zoom + pan으로 비교
   const THRESH = 10;
   const z = state.zoom;
 
@@ -76,10 +76,12 @@ function getEdgeAtPoint(px, py) {
     const fh = fromEl.offsetHeight;
     const tw = toEl.offsetWidth;
 
-    const x1 = (fromNode.x + fw / 2) * z;
-    const y1 = (fromNode.y + fh) * z;
-    const x2 = (toNode.x  + tw / 2) * z;
-    const y2 = (toNode.y) * z;
+    const px = state.panX || 0;
+    const py = state.panY || 0;
+    const x1 = (fromNode.x + fw / 2) * z + px;
+    const y1 = (fromNode.y + fh) * z + py;
+    const x2 = (toNode.x  + tw / 2) * z + px;
+    const y2 = (toNode.y) * z + py;
 
     // Sample bezier at N points and check distance
     const cp1x = x1, cp1y = y1 + (y2 - y1) * 0.5;
@@ -88,7 +90,7 @@ function getEdgeAtPoint(px, py) {
     for (let t = 0; t <= 1; t += 0.04) {
       const bx = Math.pow(1-t,3)*x1 + 3*Math.pow(1-t,2)*t*cp1x + 3*(1-t)*t*t*cp2x + Math.pow(t,3)*x2;
       const by = Math.pow(1-t,3)*y1 + 3*Math.pow(1-t,2)*t*cp1y + 3*(1-t)*t*t*cp2y + Math.pow(t,3)*y2;
-      if (Math.hypot(bx - px, by - py) < THRESH) return edge;
+      if (Math.hypot(bx - hitX, by - hitY) < THRESH) return edge;
     }
   }
   return null;
@@ -194,8 +196,8 @@ document.getElementById('canvas-wrap').addEventListener('contextmenu', e => {
 
   // 2. Check if click is near an edge (use canvas-relative coords)
   const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  const cx = mx - wrap.left;
-  const cy = my - wrap.top;
+  const cx = mx - wrap.left - (state.panX || 0);
+  const cy = my - wrap.top  - (state.panY || 0);
   const edge = getEdgeAtPoint(cx, cy);
   if (edge) {
     ctxTarget = { kind: 'edge', edge };
@@ -215,7 +217,7 @@ document.getElementById('canvas-wrap').addEventListener('contextmenu', e => {
   }
 
   // 3. Canvas background
-  // zoom 보정: canvas-wrap 기준 좌표 → canvas 내부 논리 좌표
+  // zoom 보정: pan 보정된 canvas-wrap 기준 좌표 → canvas 내부 논리 좌표
   const lcx = cx / state.zoom;
   const lcy = cy / state.zoom;
   ctxTarget = { kind: 'canvas', x: lcx, y: lcy };
@@ -598,14 +600,19 @@ function alignSameRowY(nodeId) {
 }
 
 /* ── ZOOM ─────────────────────────────────────── */
+function applyTransform() {
+  const canvasEl = document.getElementById('canvas');
+  const px = state.panX || 0;
+  const py = state.panY || 0;
+  canvasEl.style.transformOrigin = '0 0';
+  canvasEl.style.transform = `translate(${px}px, ${py}px) scale(${state.zoom})`;
+  drawEdges();
+}
+
 function applyZoom(newZoom) {
   state.zoom = Math.max(0.3, Math.min(2.5, newZoom));
-  const canvasEl = document.getElementById('canvas');
-  canvasEl.style.transform = `scale(${state.zoom})`;
-  canvasEl.style.transformOrigin = '0 0';
-  // edge-canvas는 scale 하지 않음 — drawEdges()에서 zoom 보정 좌표로 직접 그림
   document.getElementById('zoom-pct').value = Math.round(state.zoom * 100);
-  drawEdges();
+  applyTransform();
 }
 
 document.getElementById('canvas-wrap').addEventListener('wheel', e => {

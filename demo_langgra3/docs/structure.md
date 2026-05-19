@@ -9,8 +9,8 @@
 │   ├── overlays.css    # 최상위 레이어 요소 스타일: 범용 모달, 우클릭 컨텍스트 메뉴, 확인(Confirm) 다이얼로그, 프로젝트 로드 팝업(검색 및 드롭존 포함), 알림 토스트(Toast)의 디자인 및 애니메이션 담당
 │   └── settings.css    # 앱 설정 및 테마 스타일: 사이드바 로고 영역, 프로젝트 추가 버튼, 최근 항목 리스트(배지 및 메타정보), 노드 팔레트(드래그 가능한 아이템), 헤더 액션 버튼(실행/중지/저장/로드) 및 줌 컨트롤 인터페이스 디자인 담당
 └── js/                 # 자바스크립트 디렉토리
-    ├── canvas.js       # 캔버스 코어 및 노드 조작 로직: 노드 생성(Create/Clone) 및 삭제, 드래그 앤 드롭 팔레트 인터페이스, 베지에 곡선 기반 엣지(연결선) 렌더링, 줌 제어 담당. 툴 모드(_toolMode) 관리: 커서 모드(노드 드래그·라소 선택)와 손바닥 모드(캔버스 pan, state.panX/Y로 offset 추적, canvas div CSS translate 이동) 전환. 모든 좌표 계산에 pan offset 반영((clientX - wrap.left - panX) / zoom 공식 통일), drawEdges()에서 panX/Y를 더해 연결선을 셀과 동기화
-    ├── edit.js         # 편집 및 상호작용 로직: 우클릭 컨텍스트 메뉴(Context Menu) 생성 및 액션 정의, 노드 간 연결(Connect) 처리, 키보드 단축키(복사/붙여넣기, 삭제, 실행), 실행 로그 창 제어 및 다중 선택 로직 담당
+    ├── canvas.js       # 캔버스 코어 및 노드 조작 로직: 노드 생성(Create/Clone) 및 삭제, 드래그 앤 드롭 팔레트 인터페이스, 베지에 곡선 기반 엣지(연결선) 렌더링 담당. 툴 모드(_toolMode) 관리: 커서 모드(노드 드래그·라소 선택)와 손바닥 모드(캔버스 pan, state.panX/Y로 offset 추적, applyTransform() 호출로 translate+scale 통합 적용) 전환. 모든 좌표 역변환에 pan offset 반영((clientX - wrap.left - panX) / zoom 공식 통일), drawEdges()에서 각 셀의 getBoundingClientRect()로 실제 화면 좌표를 읽어 연결선을 셀과 정확히 동기화
+    ├── edit.js         # 편집 및 상호작용 로직: 우클릭 컨텍스트 메뉴(Context Menu) 생성 및 액션 정의, 노드 간 연결(Connect) 처리, 키보드 단축키(복사/붙여넣기·input/output 타입 제외, 삭제, 실행), 실행 로그 창 제어 및 다중 선택 로직 담당. applyTransform()(panX/Y + zoom을 translate+scale로 통합 적용, pan·zoom 변경 시 단일 진입점), applyZoom(), getEdgeAtPoint()(getBoundingClientRect 기반 엣지 히트테스트, drawEdges()와 동일한 좌표계 사용) 포함
     ├── inspector.js    # Inspector 패널 로직: Config/Result 탭 전환, Ollama 커스텀 모델 복원 및 저장, 노드 클릭 시 설정 패널 열기/닫기, Apply 로직, 파이프라인 유효성 검사(validatePipeline). Run 중 실시간 스트리밍 표시(openResultTabStreaming, streamResultTab), 완료 결과 표시(openResultTab, _fillResultTab) 담당
     ├── pipeline.js     # 프로젝트 스토리지, 앱 초기화 및 실행 엔진 로직: localStorage 기반 프로젝트 CRUD, 프로젝트 자동 저장 및 복원, 앱 시작 시 초기 상태 설정 및 입출력 셀 자동 생성. Run/Stop 버튼 이벤트 처리, 위상 정렬(Kahn's) 기반 셀 순차 실행, 백엔드 SSE 스트리밍 수신(runCell), 결과 저장(node.result) 및 Resume 패널 담당
     ├── settings.js     # 사용자 정의 설정 및 테마 로직: 전역 설정 상태(폰트, 크기, 색상, 테마) 관리, 실시간 스타일 반영(Live Preview), 커스텀 컬러 피커(HSV 기반) 구현 및 배경 패턴 설정 담당
