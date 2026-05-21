@@ -18,20 +18,25 @@ let _toolMode = 'cursor';
 
 /* ── PALETTE DRAG ─────────────────────────────── */
 let dragType = null;
+let _dragOffsetX = 0;
+let _dragOffsetY = 0;
 let _nodeDragMoved = false;
 
 document.querySelectorAll('.palette-item').forEach(item => {
   item.addEventListener('dragstart', e => {
     dragType = item.dataset.type;
     e.dataTransfer.effectAllowed = 'copy';
+    const rect = item.getBoundingClientRect();
+    _dragOffsetX = e.clientX - rect.left;
+    _dragOffsetY = e.clientY - rect.top;
   });
 });
 
 function handleDrop(e) {
   if (!dragType) return;
   const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  const x = (e.clientX - wrap.left - (state.panX || 0)) / state.zoom - 90;
-  const y = (e.clientY - wrap.top  - (state.panY || 0)) / state.zoom - 40;
+  const x = (e.clientX - wrap.left - _dragOffsetX - (state.panX || 0)) / state.zoom;
+  const y = (e.clientY - wrap.top  - _dragOffsetY - (state.panY || 0)) / state.zoom;
   createNode(dragType, x, y);
   dragType = null;
 }
@@ -56,8 +61,8 @@ function createNode(type, x, y) {
   const node = {
     id, type,
     name: `${labels[type] || 'CELL'} ${id}`,
-    x: Math.max(0, x),
-    y: Math.max(0, y),
+    x,
+    y,
     model: '', inputType: '', outputType: '',
     inputDesc: '', outputDesc: '', prompt: '',
     webSearch: false, domains: '',
@@ -203,8 +208,8 @@ function moveGhosts(dragIds, startPositions, dx, dy) {
     const sp = startPositions[nid];
     const g  = ghosts[i];
     if (!g) return;
-    g.style.left = Math.max(0, sp.x + dx) + 'px';
-    g.style.top  = Math.max(0, sp.y + dy) + 'px';
+    g.style.left = (sp.x + dx) + 'px';
+    g.style.top  = (sp.y + dy) + 'px';
   });
 }
 
@@ -229,7 +234,7 @@ document.addEventListener('mouseup', e => {
       const src = state.nodes.find(x => x.id === nid);
       if (!src) return;
       const sp = d.startPositions[nid];
-      cloneNode(src, Math.max(0, sp.x + dx), Math.max(0, sp.y + dy));
+      cloneNode(src, sp.x + dx, sp.y + dy);
     });
     drawEdges();
     validatePipeline();
@@ -292,7 +297,8 @@ function handleNodeClick(id) {
       state.connectingFrom = id;
       document.getElementById(`node-${id}`).classList.add('connecting-source');
       statusValid.textContent = '● Click another cell to connect...';
-      statusValid.className = 'running';
+      statusValid.classList.remove('error');
+      statusValid.classList.add('running');
       return;
     }
     selectNode(id);
@@ -466,8 +472,8 @@ document.addEventListener('mousemove', e => {
       const n = state.nodes.find(x => x.id === nid);
       if (!n) return;
       const sp = d.startPositions[nid];
-      n.x = Math.max(0, sp.x + dx);
-      n.y = Math.max(0, sp.y + dy);
+      n.x = sp.x + dx;
+      n.y = sp.y + dy;
       const el = document.getElementById('node-' + nid);
       if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
     });
@@ -666,8 +672,8 @@ function cloneNode(src, x, y) {
   const node = {
     ...JSON.parse(JSON.stringify(src)),
     id,
-    x: Math.max(0, x),
-    y: Math.max(0, y),
+    x,
+    y,
     status: 'pending',
     name: src.name + ' (copy)',
   };

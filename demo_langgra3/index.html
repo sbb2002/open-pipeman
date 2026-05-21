@@ -306,11 +306,9 @@
       </header>
 
       <!-- CANVAS -->
-      <div id="canvas-wrap">
+      <div id="canvas-wrap" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
         <canvas id="edge-canvas"></canvas>
-        <div id="canvas" 
-          ondragover="event.preventDefault()" 
-          ondrop="handleDrop(event)">
+        <div id="canvas">
           <!-- nodes rendered by JS -->
         </div>
         <div id="canvas-hint">← Drag cells from the left panel to begin</div>

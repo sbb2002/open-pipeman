@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>backend.py — 코드 리뷰 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0d0f14;
+  --bg2:     #13161e;
+  --bg3:     #1a1e29;
+  --bg4:     #212636;
+  --border:  rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text:    #e8eaf2;
+  --text2:   #8b90a8;
+  --text3:   #555a72;
+  --green:   #3ecf8e;
+  --green-d: rgba(62,207,142,0.1);
+  --red:     #f06565;
+  --red-d:   rgba(240,101,101,0.1);
+  --amber:   #f0b429;
+  --amber-d: rgba(240,180,41,0.1);
+  --blue:    #5b8dee;
+  --blue-d:  rgba(91,141,238,0.1);
+  --violet:  #a78bfa;
+  --violet-d:rgba(167,139,250,0.1);
+  --mono: 'DM Mono', monospace;
+  --sans: 'Sora', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+/* ── TOP BAR ── */
+#topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(13,15,20,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  height: 48px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tb-left { display: flex; align-items: center; gap: 10px; }
+.tb-file {
+  font-family: var(--mono); font-size: 13px; color: var(--text2);
+  background: var(--bg3); border: 1px solid var(--border);
+  padding: 3px 10px; border-radius: 4px;
+}
+.tb-badge {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 3px; border: 1px solid;
+}
+.badge-ok     { color: var(--green);  background: var(--green-d);  border-color: rgba(62,207,142,0.25); }
+.badge-warn   { color: var(--amber);  background: var(--amber-d);  border-color: rgba(240,180,41,0.25); }
+.badge-issue  { color: var(--red);    background: var(--red-d);    border-color: rgba(240,101,101,0.25); }
+.badge-info   { color: var(--blue);   background: var(--blue-d);   border-color: rgba(91,141,238,0.25); }
+.badge-violet { color: var(--violet); background: var(--violet-d); border-color: rgba(167,139,250,0.25); }
+
+.tb-tabs { display: flex; gap: 0; }
+.tb-tab {
+  font-size: 12px; color: var(--text3); padding: 0 16px; height: 48px;
+  display: flex; align-items: center; cursor: pointer; border: none;
+  background: transparent; font-family: var(--sans);
+  border-bottom: 2px solid transparent; transition: all .2s;
+}
+.tb-tab:hover { color: var(--text2); }
+.tb-tab.active { color: var(--text); border-bottom-color: var(--blue); }
+
+/* ── LAYOUT ── */
+.page { max-width: 1100px; margin: 0 auto; padding: 40px 32px 80px; }
+
+/* ── TAB PANELS ── */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── SECTION ── */
+.section {
+  margin-bottom: 40px;
+  opacity: 0; transform: translateY(16px);
+  transition: opacity .5s, transform .5s;
+}
+.section.visible { opacity: 1; transform: translateY(0); }
+
+.sec-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 3px;
+  color: var(--text3); text-transform: uppercase; margin-bottom: 10px;
+}
+.sec-title {
+  font-size: 20px; font-weight: 600; color: var(--text);
+  margin-bottom: 20px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── ESSENCE BLOCK ── */
+.essence {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: 0 8px 8px 0; padding: 22px 24px;
+  font-size: 14px; color: var(--text2); line-height: 1.85;
+  margin-bottom: 24px;
+}
+.essence strong { color: var(--text); }
+
+/* ── PIPELINE VIZ ── */
+.pipeline {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 24px 20px; margin-bottom: 8px; overflow-x: auto;
+}
+.pipe-node {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; cursor: pointer; transition: transform .15s;
+  min-width: 80px;
+}
+.pipe-node:hover { transform: translateY(-3px); }
+.pipe-node:hover .pn-box { border-color: var(--blue); }
+.pn-box {
+  width: 70px; height: 44px;
+  border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  border: 1px solid var(--border2); transition: border-color .2s;
+}
+.pn-label { font-size: 9px; color: var(--text3); font-family: var(--mono); text-align: center; }
+.pipe-arrow { color: var(--text3); font-size: 14px; padding: 0 4px; margin-top: -12px; }
+.pipe-cond { font-size: 9px; color: var(--amber); font-family: var(--mono); }
+
+/* node colors */
+.pn-start     { background: rgba(91,141,238,0.15); color: var(--blue); }
+.pn-schema    { background: rgba(167,139,250,0.12); color: var(--violet); }
+.pn-gen       { background: rgba(62,207,142,0.12);  color: var(--green); }
+.pn-intent    { background: rgba(240,180,41,0.12);  color: var(--amber); }
+.pn-exec      { background: rgba(240,180,41,0.12);  color: var(--amber); }
+.pn-human     { background: rgba(240,101,101,0.12); color: var(--red); }
+.pn-wrap      { background: rgba(62,207,142,0.12);  color: var(--green); }
+.pn-doc       { background: rgba(91,141,238,0.12);  color: var(--blue); }
+.pn-clean     { background: rgba(91,141,238,0.12);  color: var(--blue); }
+.pn-final     { background: rgba(62,207,142,0.15);  color: var(--green); }
+.pn-failed    { background: rgba(240,101,101,0.15); color: var(--red); }
+.pn-end       { background: rgba(91,141,238,0.15);  color: var(--blue); }
+
+/* ── NODE DETAIL TOOLTIP ── */
+#node-detail {
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 16px 20px; margin-top: 12px;
+  font-size: 13px; color: var(--text2); line-height: 1.75;
+  display: none;
+}
+#node-detail.show { display: block; }
+#node-detail .nd-title { font-weight: 600; color: var(--text); margin-bottom: 6px; font-size: 14px; }
+#node-detail .nd-tag   { font-family: var(--mono); font-size: 10px; }
+
+/* ── NODE INFO TABLE ── */
+.node-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.node-table th {
+  text-align: left; padding: 8px 12px;
+  background: var(--bg3); color: var(--text2);
+  font-weight: 500; border-bottom: 1px solid var(--border);
+  font-family: var(--mono); font-size: 11px;
+}
+.node-table td {
+  padding: 9px 12px; border-bottom: 1px solid var(--border);
+  vertical-align: top; color: var(--text2);
+}
+.node-table td:first-child { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.node-table tr:last-child td { border-bottom: none; }
+.node-table tr:hover td { background: var(--bg3); }
+
+/* ── REVIEW CARDS ── */
+.review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.review-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+  transition: transform .2s, box-shadow .2s;
+}
+.review-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.rc-header {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.rc-icon { font-size: 16px; }
+.rc-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.rc-body { padding: 16px 18px; font-size: 13px; color: var(--text2); line-height: 1.8; }
+.rc-body ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rc-body ul li { display: flex; gap: 10px; align-items: flex-start; }
+.li-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 8px; }
+
+.rc-good   .rc-header { background: var(--green-d); }
+.rc-good   .li-dot { background: var(--green); }
+.rc-bad    .rc-header { background: var(--red-d); }
+.rc-bad    .li-dot { background: var(--red); }
+.rc-warn   .rc-header { background: var(--amber-d); }
+.rc-warn   .li-dot { background: var(--amber); }
+.rc-info   .rc-header { background: var(--blue-d); }
+.rc-info   .li-dot { background: var(--blue); }
+
+/* ── IMPROVEMENT ITEMS ── */
+.improve-list { display: flex; flex-direction: column; gap: 14px; }
+.improve-item {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+  cursor: pointer; transition: border-color .2s;
+}
+.improve-item:hover { border-color: var(--border2); }
+.improve-item.open { border-color: var(--blue); }
+.ii-header {
+  padding: 14px 18px; display: flex; align-items: center; gap: 12px;
+}
+.ii-num {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  padding: 2px 8px; border-radius: 3px; flex-shrink: 0;
+}
+.ii-title { font-size: 14px; font-weight: 500; color: var(--text); flex: 1; }
+.ii-priority { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 3px; }
+.ii-arrow { color: var(--text3); font-size: 12px; transition: transform .25s; }
+.improve-item.open .ii-arrow { transform: rotate(180deg); }
+.ii-body {
+  display: none; padding: 16px 18px; border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.15);
+}
+.improve-item.open .ii-body { display: block; }
+.ii-section { margin-bottom: 14px; }
+.ii-section-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+  color: var(--text3); margin-bottom: 6px;
+}
+.ii-section p { font-size: 13px; color: var(--text2); line-height: 1.8; }
+.code-block {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 14px 16px;
+  font-family: var(--mono); font-size: 12px; color: #a8b5e0;
+  line-height: 1.7; overflow-x: auto; white-space: pre; margin-top: 8px;
+}
+.code-block .cm  { color: var(--text3); }
+.code-block .kw  { color: var(--violet); }
+.code-block .fn  { color: var(--blue); }
+.code-block .st  { color: var(--green); }
+.code-block .nu  { color: var(--amber); }
+
+/* ── SCORE PANEL ── */
+.score-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+.score-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px 12px; text-align: center;
+}
+.score-label { font-size: 11px; color: var(--text3); margin-bottom: 10px; font-family: var(--mono); }
+.score-bar-wrap { height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+.score-bar-fill { height: 100%; border-radius: 3px; transition: width .8s cubic-bezier(.2,.8,.3,1); }
+.score-val { font-size: 18px; font-weight: 600; }
+
+/* ── API ENDPOINTS ── */
+.endpoint-list { display: flex; flex-direction: column; gap: 10px; }
+.ep-item {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 18px;
+  display: grid; grid-template-columns: 56px 180px 1fr auto; gap: 14px; align-items: center;
+}
+.ep-method {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  padding: 3px 8px; border-radius: 3px; text-align: center;
+}
+.method-post { background: var(--green-d); color: var(--green); }
+.method-get  { background: var(--blue-d);  color: var(--blue); }
+.ep-path { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.ep-desc { font-size: 13px; color: var(--text2); }
+.ep-status { font-family: var(--mono); font-size: 10px; }
+
+/* ── SUMMARY TABLE ── */
+.summary-table { width: 100%; border-collapse: collapse; }
+.summary-table th {
+  text-align: left; padding: 10px 14px; background: var(--bg3);
+  font-family: var(--mono); font-size: 11px; color: var(--text3);
+  border-bottom: 1px solid var(--border);
+}
+.summary-table td {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--text2); vertical-align: top;
+}
+.summary-table td:first-child { color: var(--text); font-weight: 500; }
+.summary-table tr:last-child td { border-bottom: none; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .review-grid { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: repeat(3, 1fr); }
+  .ep-item { grid-template-columns: 56px 1fr; grid-template-rows: auto auto; }
+  .ep-desc, .ep-status { grid-column: span 2; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="tb-left">
+    <div class="tb-file">backend.py</div>
+    <span class="tb-badge badge-info">609 lines</span>
+    <span class="tb-badge badge-ok">LangGraph</span>
+    <span class="tb-badge badge-violet">FastAPI</span>
+    <span class="tb-badge badge-warn">요개선 4항목</span>
+  </div>
+  <div class="tb-tabs">
+    <button class="tb-tab active" onclick="switchTab('overview')">개요</button>
+    <button class="tb-tab" onclick="switchTab('nodes')">노드 분석</button>
+    <button class="tb-tab" onclick="switchTab('review')">잘한 점 / 아쉬운 점</button>
+    <button class="tb-tab" onclick="switchTab('improve')">개선 방향</button>
+    <button class="tb-tab" onclick="switchTab('api')">API 명세</button>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- ═══════════════════════════════════════════════════════ TAB: OVERVIEW -->
+<div id="tab-overview" class="tab-panel active">
+
+  <div class="section">
+    <div class="sec-label">본질 요약</div>
+    <div class="sec-title">이 파일은 무엇인가</div>
+    <div class="essence">
+      <strong>한 마디로:</strong> "자연어 프롬프트를 받아 신뢰할 수 있는 Python 노드 코드를 생성·검증·패키징하는 LangGraph 기반 실행 엔진"<br><br>
+      사용자가 Cell에 자연어로 의도를 입력하면, 이 백엔드가 ① LLM으로 코드를 생성하고, ② LLM이 다시 그 코드를 의도 기준으로 검증하고, ③ 실제로 실행해 런타임 오류를 확인하고, ④ Human-in-the-loop 포인트를 거쳐, ⑤ 타입·스키마까지 완비된 재사용 가능한 함수로 래핑해 반환한다.<br><br>
+      핵심 설계 철학은 <strong>"확률적 LLM을 결정론적 DAG로 제어"</strong>다. 코드 생성이 실패하면 피드백을 주입해 재시도(최대 3회)하고, 성공해도 인간 검토 포인트(human_review)를 통과해야 다음 단계로 넘어간다.
+    </div>
+
+    <!-- SCORE -->
+    <div class="sec-label" style="margin-top:32px">종합 평가</div>
+    <div class="score-grid" id="scoreGrid">
+      <div class="score-card">
+        <div class="score-label">구조 설계</div>
+        <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%; background:var(--green)" data-target="88"></div></div>
+        <div class="score-val" style="color:var(--green)">88</div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">검증 체계</div>
+        <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%; background:var(--blue)" data-target="75"></div></div>
+        <div class="score-val" style="color:var(--blue)">75</div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">보안</div>
+        <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%; background:var(--red)" data-target="42"></div></div>
+        <div class="score-val" style="color:var(--red)">42</div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">확장성</div>
+        <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%; background:var(--amber)" data-target="60"></div></div>
+        <div class="score-val" style="color:var(--amber)">60</div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">운영 준비도</div>
+        <div class="score-bar-wrap"><div class="score-bar-fill" style="width:0%; background:var(--violet)" data-target="50"></div></div>
+        <div class="score-val" style="color:var(--violet)">50</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">실행 파이프라인</div>
+    <div class="sec-title">노드 흐름도 — 클릭해서 상세 보기</div>
+    <div class="pipeline">
+      <div class="pipe-node" onclick="showNodeDetail('start')">
+        <div class="pn-box pn-start">START</div>
+        <div class="pn-label">진입</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('inject_schema')">
+        <div class="pn-box pn-schema">inject<br>schema</div>
+        <div class="pn-label">스키마 주입</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('generate')">
+        <div class="pn-box pn-gen">generate</div>
+        <div class="pn-label">코드 생성</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('validate_intent')">
+        <div class="pn-box pn-intent">validate<br>intent</div>
+        <div class="pn-label">의도 검증</div>
+        <div class="pn-label pipe-cond">조건분기</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('execute')">
+        <div class="pn-box pn-exec">execute</div>
+        <div class="pn-label">실행 검증</div>
+        <div class="pn-label pipe-cond">조건분기</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('human_review')">
+        <div class="pn-box pn-human">human<br>review</div>
+        <div class="pn-label">인간 검토</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('wrap')">
+        <div class="pn-box pn-wrap">wrap</div>
+        <div class="pn-label">래핑</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('docstring')">
+        <div class="pn-box pn-doc">docstring</div>
+        <div class="pn-label">문서화</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('cleanup')">
+        <div class="pn-box pn-clean">cleanup</div>
+        <div class="pn-label">코드 정리</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('finalize')">
+        <div class="pn-box pn-final">finalize</div>
+        <div class="pn-label">패키징</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" onclick="showNodeDetail('end')">
+        <div class="pn-box pn-end">END</div>
+        <div class="pn-label">완료</div>
+      </div>
+    </div>
+    <div style="font-family:var(--mono); font-size:11px; color:var(--text3); margin-bottom:12px">
+      ↑ 실패 시: validate_intent / execute → failed → END (최대 3회 재시도 후)
+    </div>
+    <div id="node-detail"></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">세부 기능 요약</div>
+    <div class="sec-title">각 노드가 하는 일</div>
+    <table class="node-table">
+      <thead>
+        <tr>
+          <th>노드</th>
+          <th>역할</th>
+          <th>핵심 동작</th>
+          <th>출력</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>inject_schema</td><td>컨텍스트 주입</td><td>upstream output_schema를 프롬프트에 병합 (Schema-First)</td><td>enriched_prompt</td></tr>
+        <tr><td>generate</td><td>코드 생성</td><td>LLM에게 순수 Python 함수 코드 생성 요청. 이전 피드백 있으면 함께 주입</td><td>generated_code</td></tr>
+        <tr><td>validate_intent</td><td>의도 검증</td><td>LLM이 생성 코드를 다시 리뷰. PASS/FAIL 판정 → 실패 시 generate 재시도</td><td>intent_ok, feedback</td></tr>
+        <tr><td>execute</td><td>실행 검증</td><td>AST 파싱 + exec()로 실제 실행. SyntaxError·RuntimeError 포착 → 실패 시 재시도</td><td>exec_ok, exec_error</td></tr>
+        <tr><td>human_review</td><td>인간 검토 포인트</td><td>현재는 pass-through. 프론트에서 /resume으로 코드 수정 주입 가능</td><td>stage 기록</td></tr>
+        <tr><td>wrap</td><td>함수 래핑 + 스키마 추론</td><td>LLM이 타입 어노테이션, input/output schema를 JSON으로 반환</td><td>wrapped_code, schemas</td></tr>
+        <tr><td>docstring</td><td>문서화</td><td>LLM이 Google-style docstring 삽입</td><td>wrapped_code (updated), docstring</td></tr>
+        <tr><td>cleanup</td><td>코드 정리</td><td>미사용 변수·중복 주석 제거. 로직 변경 금지</td><td>wrapped_code (cleaned)</td></tr>
+        <tr><td>finalize</td><td>결과 패키징</td><td>최종 상태를 done으로 전이, 스키마 정보를 로그로 기록</td><td>status=done</td></tr>
+        <tr><td>failed</td><td>실패 처리</td><td>재시도 상한 초과 시 status=failed, 마지막 오류 기록</td><td>status=failed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TAB: NODES -->
+<div id="tab-nodes" class="tab-panel">
+
+  <div class="section">
+    <div class="sec-label">LLM 호출 분석</div>
+    <div class="sec-title">파이프라인 내 LLM 호출 횟수</div>
+    <div class="essence">
+      셀 하나를 처음 실행할 때 <strong>최소 5회, 최대 9회</strong>의 LLM 호출이 발생한다.<br>
+      (generate + validate_intent + wrap + docstring + cleanup) × 재시도
+    </div>
+    <table class="node-table">
+      <thead>
+        <tr><th>노드</th><th>LLM 호출</th><th>모델 분기</th><th>max_tokens</th><th>비고</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>generate</td><td>✅ 1회</td><td>Anthropic / Ollama</td><td>2048</td><td>재시도 시 +1회</td></tr>
+        <tr><td>validate_intent</td><td>✅ 1회</td><td>동일 모델</td><td>256</td><td>PASS/FAIL 판정만</td></tr>
+        <tr><td>wrap</td><td>✅ 1회</td><td>동일 모델</td><td>2048</td><td>JSON 출력 필수</td></tr>
+        <tr><td>docstring</td><td>✅ 1회</td><td>동일 모델</td><td>2048</td><td>Google-style</td></tr>
+        <tr><td>cleanup</td><td>✅ 1회</td><td>동일 모델</td><td>2048</td><td>로직 변경 금지</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">재시도 로직</div>
+    <div class="sec-title">retry_count 흐름</div>
+    <div class="essence">
+      <code style="color:var(--green); font-family:var(--mono)">retry_count</code>는 <strong>validate_intent</strong>와 <strong>execute</strong> 두 노드에서 각각 누적된다.<br>
+      문제: 두 노드가 카운터를 <strong>공유</strong>하므로, 의도 실패 2회 + 실행 실패 1회 = 총 3회로 조기 종료될 수 있다. 실질적 재시도 기회가 기대보다 적다.
+    </div>
+    <div class="code-block"><span class="cm"># edge_after_intent</span>
+<span class="kw">def</span> <span class="fn">edge_after_intent</span>(state):
+    <span class="kw">if</span> state[<span class="st">"retry_count"</span>] >= <span class="nu">3</span>:   <span class="cm"># ← intent+exec 합산 카운트</span>
+        <span class="kw">return</span> <span class="st">"failed"</span>
+    <span class="kw">if not</span> state[<span class="st">"intent_ok"</span>]:
+        <span class="kw">return</span> <span class="st">"generate"</span>
+    <span class="kw">return</span> <span class="st">"execute"</span></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Human-in-the-loop 실제 동작</div>
+    <div class="sec-title">현재 node_human_review의 한계</div>
+    <div class="essence">
+      현재 <code style="font-family:var(--mono); color:var(--red)">node_human_review</code>는 <strong>pass-through 노드</strong>다. 코드가 실행 통과되면 인간 확인 없이 자동으로 wrap으로 넘어간다.<br><br>
+      명세에는 "Human-in-the-loop(일시정지 및 개입)"이 목표로 적혀 있지만, 현재 구현은 <strong>/cell/stop → /cell/resume</strong> 흐름을 프론트가 명시적으로 호출해야만 개입이 이루어진다. 즉 백엔드가 자동으로 멈추지 않는다.
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TAB: REVIEW -->
+<div id="tab-review" class="tab-panel">
+
+  <div class="section">
+    <div class="sec-label">코드 리뷰</div>
+    <div class="sec-title">잘한 점 / 아쉬운 점</div>
+    <div class="review-grid">
+
+      <div class="review-card rc-good">
+        <div class="rc-header">
+          <div class="rc-icon">✅</div>
+          <div class="rc-title">잘한 점 — 구조 설계</div>
+        </div>
+        <div class="rc-body"><ul>
+          <li><div class="li-dot"></div>LangGraph의 DAG + MemorySaver 체크포인터 조합으로 상태를 노드 간에 안전하게 전달. 중간 실패 시 체크포인트에서 재개 가능한 구조.</li>
+          <li><div class="li-dot"></div>지연 초기화(Lazy Init)로 API 키 없이도 서버가 뜬다. 개발 환경에서의 DX가 좋다.</li>
+          <li><div class="li-dot"></div>모델명 prefix로 Anthropic/Ollama를 자동 분기. 로컬 모델 교체가 쉽고 테스트하기 유리하다.</li>
+          <li><div class="li-dot"></div>SSE 스트리밍으로 각 단계(stage_start, log, result, done)를 실시간 전달. 프론트가 진행 상황을 즉각 반영할 수 있다.</li>
+          <li><div class="li-dot"></div>Schema-First 설계: upstream_schema를 프롬프트에 주입해 셀 간 I/O 타입 연속성을 보장한다.</li>
+        </ul></div>
+      </div>
+
+      <div class="review-card rc-bad">
+        <div class="rc-header">
+          <div class="rc-icon">⚠️</div>
+          <div class="rc-title">아쉬운 점 — 보안 · 안정성</div>
+        </div>
+        <div class="rc-body"><ul>
+          <li><div class="li-dot"></div><strong>exec()가 격리되지 않음.</strong> namespace를 분리해도 os, subprocess, sys 등 위험 모듈에 대한 접근 차단이 없다. 악성 코드가 호스트에 영향을 줄 수 있다.</li>
+          <li><div class="li-dot"></div><strong>node_human_review가 pass-through.</strong> 명세의 HITL 개념과 달리, 현재는 인간이 개입하지 않아도 자동으로 wrap으로 진행된다.</li>
+          <li><div class="li-dot"></div><strong>retry_count가 intent·exec 구분 없이 합산.</strong> 의도 검증 실패와 실행 실패가 같은 카운터를 공유해 재시도 기회가 예상보다 줄어든다.</li>
+          <li><div class="li-dot"></div><strong>CORS가 allow_origins=["*"].</strong> 프로덕션에서 모든 오리진 허용은 보안 위험. 개발 편의용으로만 허용해야 한다.</li>
+          <li><div class="li-dot"></div><strong>MemorySaver는 프로세스 재시작 시 소멸.</strong> 서버 재시작 시 실행 중이던 셀 상태가 전부 사라진다.</li>
+        </ul></div>
+      </div>
+
+      <div class="review-card rc-warn">
+        <div class="rc-header">
+          <div class="rc-icon">🔍</div>
+          <div class="rc-title">아쉬운 점 — 기능 완성도</div>
+        </div>
+        <div class="rc-body"><ul>
+          <li><div class="li-dot"></div>wrap 노드의 JSON 파싱 실패 시 폴백(fallback)이 빈 스키마({})로 처리된다. 스키마 없는 노드가 파이프라인에 연결되면 다운스트림이 조용히 깨진다.</li>
+          <li><div class="li-dot"></div>validate_intent가 LLM에게 LLM 코드를 리뷰시키는 구조. 같은 모델이 생성하고 검증하므로 같은 편향(bias)을 공유할 가능성이 높다.</li>
+          <li><div class="li-dot"></div>cleanup 노드가 LLM 호출 1회를 소비하는데, 이는 AST 기반 정적 분석(예: autoflake, isort)으로 대체하면 속도와 비용을 모두 줄일 수 있다.</li>
+          <li><div class="li-dot"></div>실행 검증(execute)이 함수 호출이 아닌 코드 로드만 테스트. 실제 인자를 넣어 return 값이 올바른지는 검증하지 않는다.</li>
+        </ul></div>
+      </div>
+
+      <div class="review-card rc-info">
+        <div class="rc-header">
+          <div class="rc-icon">💡</div>
+          <div class="rc-title">주목할 점 — 설계 의도</div>
+        </div>
+        <div class="rc-body"><ul>
+          <li><div class="li-dot"></div>stream_log를 Annotated[list[str], lambda a, b: a+b]로 선언해 LangGraph의 reducer 패턴으로 로그를 누적. 노드 순서와 무관하게 전체 로그 추적이 가능하다.</li>
+          <li><div class="li-dot"></div>_sse() 헬퍼 함수로 SSE 포맷을 추상화. 이벤트 타입(stage_start/log/result/done)이 명확히 분리되어 있어 프론트 파싱이 깔끔하다.</li>
+          <li><div class="li-dot"></div>/cell/resume에서 update_state + as_node="human_review"를 활용해 인간이 수정한 코드를 체크포인트에 직접 주입하는 방식이 올바르다.</li>
+          <li><div class="li-dot"></div>on_chain_end에서 누락될 수 있는 누적 필드를 get_state()로 직접 읽는 처리가 꼼꼼하다 (주석으로도 이유를 설명함).</li>
+        </ul></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TAB: IMPROVE -->
+<div id="tab-improve" class="tab-panel">
+
+  <div class="section">
+    <div class="sec-label">개선 방향 — 우선순위 순</div>
+    <div class="sec-title">4가지 핵심 개선 항목</div>
+    <div class="improve-list">
+
+      <!-- 1 -->
+      <div class="improve-item" onclick="toggleImprove(this)">
+        <div class="ii-header">
+          <div class="ii-num badge-issue" style="border:none; padding:3px 10px">P1</div>
+          <div class="ii-title">exec() 샌드박스 격리 — 보안 위험 제거</div>
+          <div class="ii-priority badge-issue" style="border:none">즉시 필요</div>
+          <div class="ii-arrow">↓</div>
+        </div>
+        <div class="ii-body">
+          <div class="ii-section">
+            <div class="ii-section-label">문제</div>
+            <p>현재 exec()는 namespace를 분리하지만, 격리된 환경이 아니다. 생성된 코드에서 <code style="color:var(--red); font-family:var(--mono)">import os; os.system("rm -rf /")</code>를 막을 방법이 없다.</p>
+          </div>
+          <div class="ii-section">
+            <div class="ii-section-label">개선 방향</div>
+            <p>단기: <strong>RestrictedPython</strong>으로 허용 빌트인(builtins)만 노출하는 화이트리스트 방식 적용.<br>
+            중기: <strong>subprocess + Docker 컨테이너</strong> 또는 <strong>e2b sandbox</strong>에서 코드를 실행하고 결과만 수신.</p>
+          </div>
+          <div class="code-block"><span class="cm"># 단기 적용 예시 — RestrictedPython</span>
+<span class="kw">from</span> RestrictedPython <span class="kw">import</span> compile_restricted, safe_globals
+
+safe_ns = {<span class="st">"__builtins__"</span>: safe_globals[<span class="st">"__builtins__"</span>]}
+byte_code = compile_restricted(code, <span class="st">"&lt;cell&gt;"</span>, <span class="st">"exec"</span>)
+exec(byte_code, safe_ns)  <span class="cm"># os, sys 접근 불가</span></div>
+        </div>
+      </div>
+
+      <!-- 2 -->
+      <div class="improve-item" onclick="toggleImprove(this)">
+        <div class="ii-header">
+          <div class="ii-num badge-warn" style="border:none; padding:3px 10px">P2</div>
+          <div class="ii-title">node_human_review를 실제 중단점(Interrupt)으로 구현</div>
+          <div class="ii-priority badge-warn" style="border:none">프론트 연동 전 필요</div>
+          <div class="ii-arrow">↓</div>
+        </div>
+        <div class="ii-body">
+          <div class="ii-section">
+            <div class="ii-section-label">문제</div>
+            <p>현재 human_review는 아무 동작 없이 통과한다. "Human-in-the-loop"이라는 명세 목표와 불일치. 프론트에서 Stop을 누르지 않는 한 인간이 개입할 수 없다.</p>
+          </div>
+          <div class="ii-section">
+            <div class="ii-section-label">개선 방향</div>
+            <p>LangGraph의 <code style="font-family:var(--mono); color:var(--blue)">interrupt()</code>를 human_review 노드에 적용하면, 이 시점에 그래프가 자동으로 일시정지하고 프론트에 paused 이벤트를 SSE로 전달한다. 이후 /resume 호출 시 재개.</p>
+          </div>
+          <div class="code-block"><span class="kw">from</span> langgraph.types <span class="kw">import</span> interrupt
+
+<span class="kw">async def</span> <span class="fn">node_human_review</span>(state):
+    <span class="cm"># 이 시점에 그래프가 자동 일시정지</span>
+    human_input = interrupt({
+        <span class="st">"code"</span>: state[<span class="st">"generated_code"</span>],
+        <span class="st">"message"</span>: <span class="st">"코드를 검토하고 승인하거나 수정하세요"</span>
+    })
+    <span class="kw">return</span> {
+        <span class="st">"generated_code"</span>: human_input.get(<span class="st">"updated_code"</span>) <span class="kw">or</span> state[<span class="st">"generated_code"</span>],
+        <span class="st">"stage"</span>: <span class="st">"human_review"</span>,
+    }</div>
+        </div>
+      </div>
+
+      <!-- 3 -->
+      <div class="improve-item" onclick="toggleImprove(this)">
+        <div class="ii-header">
+          <div class="ii-num badge-warn" style="border:none; padding:3px 10px">P3</div>
+          <div class="ii-title">retry_count를 intent / exec 별로 분리</div>
+          <div class="ii-priority badge-warn" style="border:none">로직 버그 수정</div>
+          <div class="ii-arrow">↓</div>
+        </div>
+        <div class="ii-body">
+          <div class="ii-section">
+            <div class="ii-section-label">문제</div>
+            <p>의도 검증 실패 2회 + 실행 실패 1회를 합산해 3회로 처리한다. 사용자 입장에서 실행 실패는 단 1번의 재시도 기회만 얻게 되어 기대보다 조기 종료된다.</p>
+          </div>
+          <div class="ii-section">
+            <div class="ii-section-label">개선 방향</div>
+            <p>CellState에 <code style="font-family:var(--mono); color:var(--green)">intent_retry</code>와 <code style="font-family:var(--mono); color:var(--green)">exec_retry</code>를 별도로 선언하고, 각 엣지 함수에서 독립적으로 체크한다.</p>
+          </div>
+          <div class="code-block"><span class="cm"># CellState 수정</span>
+intent_retry_count: int   <span class="cm"># validate_intent 전용</span>
+exec_retry_count: int     <span class="cm"># execute 전용</span>
+
+<span class="cm"># 각 엣지 함수도 독립 체크</span>
+<span class="kw">def</span> <span class="fn">edge_after_intent</span>(state):
+    <span class="kw">if</span> state[<span class="st">"intent_retry_count"</span>] >= MAX_INTENT_RETRIES:
+        <span class="kw">return</span> <span class="st">"failed"</span>
+    ...
+
+<span class="kw">def</span> <span class="fn">edge_after_execute</span>(state):
+    <span class="kw">if</span> state[<span class="st">"exec_retry_count"</span>] >= MAX_RETRIES:
+        <span class="kw">return</span> <span class="st">"failed"</span>
+    ...</div>
+        </div>
+      </div>
+
+      <!-- 4 -->
+      <div class="improve-item" onclick="toggleImprove(this)">
+        <div class="ii-header">
+          <div class="ii-num badge-info" style="border:none; padding:3px 10px">P4</div>
+          <div class="ii-title">cleanup 노드를 AST 정적 분석으로 교체 + 실행 검증 강화</div>
+          <div class="ii-priority badge-info" style="border:none">성능 · 품질 개선</div>
+          <div class="ii-arrow">↓</div>
+        </div>
+        <div class="ii-body">
+          <div class="ii-section">
+            <div class="ii-section-label">문제 ①  cleanup LLM 호출</div>
+            <p>미사용 변수 제거, import 정리는 LLM 없이도 정적 분석 도구로 처리 가능하다. LLM 호출 1회를 아끼면 비용과 지연 시간이 줄어든다.</p>
+          </div>
+          <div class="ii-section">
+            <div class="ii-section-label">문제 ②  execute가 로드만 테스트</div>
+            <p>실제 함수 호출 없이 코드가 실행 가능한지만 본다. 사용자가 샘플 I/O를 제공하면, 해당 인자로 실제 호출해 return 값이 expected output과 일치하는지 검증해야 명세의 "자동 검증 시스템"이 완성된다.</p>
+          </div>
+          <div class="code-block"><span class="cm"># cleanup 교체</span>
+<span class="kw">import</span> autoflake, black
+
+cleaned = autoflake.fix_code(code, remove_unused_imports=<span class="nu">True</span>)
+cleaned = black.format_str(cleaned, mode=black.Mode())
+
+<span class="cm"># execute 강화 — 샘플 I/O 테스트</span>
+<span class="kw">if</span> sample_inputs:
+    fn_name = list(namespace.keys())[-<span class="nu">1</span>]
+    result = namespace[fn_name](**sample_inputs)
+    assert result == expected_output, <span class="fn">f</span><span class="st">"expected {expected_output}, got {result}"</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TAB: API -->
+<div id="tab-api" class="tab-panel">
+
+  <div class="section">
+    <div class="sec-label">FastAPI 엔드포인트</div>
+    <div class="sec-title">API 명세</div>
+    <div class="endpoint-list">
+      <div class="ep-item">
+        <div class="ep-method method-post">POST</div>
+        <div class="ep-path">/cell/run</div>
+        <div class="ep-desc">셀 실행 시작. SSE 스트림으로 stage_start → log → result → done 이벤트를 순서대로 전달한다.</div>
+        <div class="ep-status badge-ok" style="border:none">✅ 구현 완료</div>
+      </div>
+      <div class="ep-item">
+        <div class="ep-method method-post">POST</div>
+        <div class="ep-path">/cell/stop/{cell_id}</div>
+        <div class="ep-desc">실행 중인 셀을 paused로 전이. 체크포인트는 MemorySaver에 보존된다. ⚠ 현재 그래프 실행을 즉시 중단하지는 않음.</div>
+        <div class="ep-status badge-warn" style="border:none">⚠ 부분 구현</div>
+      </div>
+      <div class="ep-item">
+        <div class="ep-method method-post">POST</div>
+        <div class="ep-path">/cell/resume</div>
+        <div class="ep-desc">일시정지된 셀을 재개. updated_code를 body에 포함하면 human_review 노드로 수정 코드를 주입한다.</div>
+        <div class="ep-status badge-ok" style="border:none">✅ 구현 완료</div>
+      </div>
+      <div class="ep-item">
+        <div class="ep-method method-get">GET</div>
+        <div class="ep-path">/cell/state/{cell_id}</div>
+        <div class="ep-desc">현재 셀의 체크포인트 스냅샷을 반환. status, code, docstring, schemas, logs 포함.</div>
+        <div class="ep-status badge-ok" style="border:none">✅ 구현 완료</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">SSE 이벤트 타입</div>
+    <div class="sec-title">프론트가 수신하는 이벤트</div>
+    <table class="summary-table">
+      <thead><tr><th>event</th><th>data 구조</th><th>발생 시점</th></tr></thead>
+      <tbody>
+        <tr><td>stage_start</td><td>{"stage": "generate"}</td><td>각 노드 실행 시작 시</td></tr>
+        <tr><td>log</td><td>{"logs": ["[generate] ..."]}</td><td>각 노드 완료 후 stream_log 전달</td></tr>
+        <tr><td>result</td><td>{cell_id, status, code, docstring, schemas, logs}</td><td>status가 done 또는 failed일 때</td></tr>
+        <tr><td>done</td><td>{}</td><td>스트림 종료 신호</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">분석 API 연동 제안</div>
+    <div class="sec-title">오늘 만든 분석 API와 연결 포인트</div>
+    <div class="essence">
+      <strong>연결 포인트:</strong> human_review 노드 또는 finalize 노드에서 분석 API를 호출하면, 생성된 코드·스키마·실행 결과를 자동으로 신뢰도 평가하고 warn/err 항목을 SSE로 프론트에 전달할 수 있다.<br><br>
+      예: confidence가 0.7 미만이면 human_review에서 자동 interrupt() 발동 → 프론트 대시보드에 검증 요청 표시.
+    </div>
+    <table class="summary-table">
+      <thead><tr><th>연결 위치</th><th>역할</th><th>효과</th></tr></thead>
+      <tbody>
+        <tr><td>human_review 진입 전</td><td>생성 코드 신뢰도 평가</td><td>confidence 낮으면 자동 중단, 높으면 자동 통과</td></tr>
+        <tr><td>finalize 직전</td><td>최종 결과물 요약</td><td>output_schema, docstring 품질을 점수화해 프론트에 표시</td></tr>
+        <tr><td>failed 노드</td><td>실패 원인 분류</td><td>intent_fail / exec_fail / timeout을 자동 태깅해 재시도 전략 제안</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+</div><!-- /page -->
+
+<script>
+// ── TAB SWITCHING ─────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tb-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  // re-trigger visible animations
+  setTimeout(() => {
+    document.querySelectorAll('#tab-' + name + ' .section').forEach(s => {
+      s.classList.remove('visible');
+      void s.offsetWidth;
+      s.classList.add('visible');
+    });
+  }, 30);
+}
+
+// ── INTERSECTION OBSERVER ─────────────────────────────────
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.08 });
+document.querySelectorAll('.section').forEach(s => obs.observe(s));
+
+// ── SCORE BAR ANIMATION ───────────────────────────────────
+const scoreObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.score-bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.target + '%';
+      });
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('#scoreGrid').forEach(el => scoreObs.observe(el));
+
+// ── NODE DETAIL ───────────────────────────────────────────
+const NODE_INFO = {
+  start:           { title: 'START', color: 'var(--blue)',   desc: 'RunCellRequest를 받아 초기 CellState를 구성하고 파이프라인에 진입한다. cell_id가 thread_id로 사용된다.' },
+  inject_schema:   { title: 'inject_schema', color: 'var(--violet)', desc: 'upstream_schema(이전 셀 output)를 프롬프트 말미에 [SCHEMA CONTEXT]로 병합한다. Schema-First 원칙의 실현 포인트.' },
+  generate:        { title: 'generate', color: 'var(--green)', desc: 'LLM에게 순수 Python 함수 코드를 생성하도록 요청한다. 이전 intent_feedback 또는 exec_error가 있으면 [PREVIOUS FEEDBACK]으로 주입해 재시도한다.' },
+  validate_intent: { title: 'validate_intent', color: 'var(--amber)', desc: 'LLM이 생성된 코드를 사용자 의도와 비교해 PASS/FAIL을 판정한다. FAIL이면 generate로 재시도. retry_count >= MAX_RETRIES면 failed로 전이.' },
+  execute:         { title: 'execute', color: 'var(--amber)', desc: 'AST 파싱 후 exec()로 코드를 격리 namespace에서 실행한다. SyntaxError, RuntimeError를 포착해 exec_error에 저장. 실패 시 generate로 재시도.' },
+  human_review:    { title: 'human_review ⚠', color: 'var(--red)', desc: '현재는 pass-through 노드. 명세의 HITL 목표와 달리 자동으로 wrap으로 진행한다. interrupt() 적용이 필요한 개선 포인트.' },
+  wrap:            { title: 'wrap', color: 'var(--green)', desc: 'LLM이 코드를 단일 함수/클래스로 래핑하고 input_schema, output_schema를 JSON으로 반환한다. Schema-First 파이프라인의 핵심 출력.' },
+  docstring:       { title: 'docstring', color: 'var(--blue)', desc: 'LLM이 wrapped_code에 Google-style docstring(summary, Args, Returns, Raises)을 삽입한다.' },
+  cleanup:         { title: 'cleanup', color: 'var(--blue)', desc: 'LLM이 미사용 변수, 불필요한 주석을 제거한다. ⚠ LLM 호출 대신 autoflake+black으로 대체하면 비용과 속도 모두 개선 가능.' },
+  finalize:        { title: 'finalize', color: 'var(--green)', desc: 'status를 done으로 전이하고 cell_id, input_schema, output_schema를 최종 로그로 기록한다.' },
+  failed:          { title: 'failed', color: 'var(--red)', desc: '재시도 상한 초과 시 status=failed로 전이. exec_error 또는 intent_feedback을 마지막 오류로 기록.' },
+  end:             { title: 'END', color: 'var(--blue)', desc: '파이프라인 종료. SSE done 이벤트가 프론트로 전송된다. 체크포인트는 MemorySaver에 남는다.' },
+};
+
+function showNodeDetail(key) {
+  const info = NODE_INFO[key];
+  if (!info) return;
+  const el = document.getElementById('node-detail');
+  el.innerHTML = `<div class="nd-title" style="color:${info.color}">${info.title}</div><p>${info.desc}</p>`;
+  el.classList.add('show');
+}
+
+// ── IMPROVE ACCORDION ─────────────────────────────────────
+function toggleImprove(el) {
+  const isOpen = el.classList.contains('open');
+  document.querySelectorAll('.improve-item.open').forEach(i => i.classList.remove('open'));
+  if (!isOpen) el.classList.add('open');
+}
+</script>
+</body>
+</html>

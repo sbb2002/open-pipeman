@@ -1,9 +1,10 @@
 # backend.py
 # Visual AI Pipeline Builder - Backend Execution Engine
-# 의존성: pip install fastapi uvicorn langgraph anthropic openai
+# 의존성: pip install fastapi uvicorn langgraph anthropic openai e2b-code-interpreter python-dotenv
 
 from __future__ import annotations
 
+import os
 import ast
 import io
 import json
@@ -23,6 +24,10 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated, TypedDict
 
+from dotenv import load_dotenv
+load_dotenv()
+
+
 # ---------------------------------------------------------------------------
 # 상수
 # ---------------------------------------------------------------------------
@@ -31,7 +36,7 @@ MODEL_DEFAULT = "claude-sonnet-4-20250514"
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
 MAX_RETRIES = 3
 MAX_INTENT_RETRIES = 2
-
+E2B_API_KEY = os.getenv("E2B_API_KEY")  # E2B API Key (형식 맞추기용 더미값)
 
 # ---------------------------------------------------------------------------
 # LangGraph 상태 정의
@@ -200,34 +205,59 @@ async def node_validate_intent(state: CellState) -> dict:
 # 노드 3 : 코드 실행 검증 (샌드박스)
 # ---------------------------------------------------------------------------
 
+# async def node_execute(state: CellState) -> dict:
+#     """생성된 코드를 격리된 namespace에서 실행하여 런타임 오류를 검증한다."""
+#     code = state["generated_code"]
+#     stdout_buf, stderr_buf = io.StringIO(), io.StringIO()
+#     namespace: dict[str, Any] = {}
+#     error_msg = ""
+#     ok = False
+
+#     try:
+#         ast.parse(code)
+#         with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+#             exec(compile(code, "<cell>", "exec"), namespace)  # noqa: S102
+#         ok = True
+#     except SyntaxError as e:
+#         error_msg = f"SyntaxError at line {e.lineno}: {e.msg}"
+#     except Exception:
+#         tb_lines = traceback.format_exc().splitlines()
+#         error_msg = "\n".join(tb_lines[-3:])
+
+#     retry = state.get("retry_count", 0) + (0 if ok else 1)
+#     return {
+#         "exec_ok": ok,
+#         "exec_error": error_msg,
+#         "retry_count": retry,
+#         "stage": "execute",
+#         "stream_log": [f"[execute] {'OK' if ok else 'ERROR — ' + error_msg}"],
+#     }
+
+from e2b_code_interpreter import AsyncSandbox
+
 async def node_execute(state: CellState) -> dict:
-    """생성된 코드를 격리된 namespace에서 실행하여 런타임 오류를 검증한다."""
     code = state["generated_code"]
-    stdout_buf, stderr_buf = io.StringIO(), io.StringIO()
-    namespace: dict[str, Any] = {}
-    error_msg = ""
     ok = False
+    error_msg = ""
 
+    sandbox = await AsyncSandbox.create()  # 환경변수에서 자동 읽음
     try:
-        ast.parse(code)
-        with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-            exec(compile(code, "<cell>", "exec"), namespace)  # noqa: S102
-        ok = True
-    except SyntaxError as e:
-        error_msg = f"SyntaxError at line {e.lineno}: {e.msg}"
-    except Exception:
-        tb_lines = traceback.format_exc().splitlines()
-        error_msg = "\n".join(tb_lines[-3:])
+        result = await sandbox.run_code(code)
+        ok = not result.error
+        error_msg = result.error.value if result.error else ""
+    except Exception as e:
+        error_msg = str(e)
+    finally:
+        await sandbox.kill()  # 항상 소멸 보장
 
-    retry = state.get("retry_count", 0) + (0 if ok else 1)
+    retry = state.get("exec_retry_count", 0) + (0 if ok else 1)
     return {
         "exec_ok": ok,
         "exec_error": error_msg,
-        "retry_count": retry,
+        "exec_retry_count": retry,
         "stage": "execute",
         "stream_log": [f"[execute] {'OK' if ok else 'ERROR — ' + error_msg}"],
     }
-
 
 # ---------------------------------------------------------------------------
 # 노드 4 : 래핑
