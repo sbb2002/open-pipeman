@@ -21,6 +21,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.errors import GraphInterrupt
+from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated, TypedDict
 
@@ -65,6 +67,7 @@ class CellState(TypedDict):
 
     # ── 흐름 제어 ────────────────────────────────────────────────────────────
     status: str                          # pending | running | paused | done | failed
+    hr_action: str                         # human_review 결정: '' | 'approved' | 'rewrite'
     stage: str                           # 현재 단계명 (스트리밍용)
     stream_log: Annotated[list[str], lambda a, b: a + b]
 
@@ -408,13 +411,42 @@ def edge_after_execute(state: CellState) -> str:
 
 async def node_human_review(state: CellState) -> dict:
     """
-    코드 검증 완료 후 wrap 단계로 바로 진행한다.
-    결과는 finalize 이후 프론트엔드 Result 탭에서 확인 가능하다.
+    Human-in-the-loop 인터럽트 노드.
+    interrupt()로 그래프를 일시정지하고 프론트의 paused 이벤트를 트리거한다.
+    resume 시 반환값으로 승인/재작성을 판정한다.
     """
-    return {
-        "stage": "human_review",
-        "stream_log": [f"[human_review] code verified ({len(state.get('generated_code', ''))} chars) — proceeding to wrap"],
-    }
+    code = state.get("generated_code", "")
+
+    resume_payload = interrupt({
+        "code": code,
+        "message": "Human review required.",
+    })
+
+    comment = None
+    if isinstance(resume_payload, dict):
+        comment = resume_payload.get("updated_code")  # rewrite 시에만 존재
+
+    if comment:
+        return {
+            "hr_action": "rewrite",
+            "intent_feedback": comment,
+            "exec_ok": False,
+            "retry_count": 0,
+            "stage": "human_review",
+            "stream_log": [f"[human_review] rewrite requested ({len(comment)} chars)"],
+        }
+    else:
+        return {
+            "hr_action": "approved",
+            "stage": "human_review",
+            "stream_log": [f"[human_review] approved ({len(code)} chars)"],
+        }
+
+
+def edge_after_human_review(state: CellState) -> str:
+    if state.get('hr_action') == 'rewrite':
+        return 'generate'
+    return 'wrap'
 
 
 # ---------------------------------------------------------------------------
@@ -450,7 +482,11 @@ def build_graph() -> StateGraph:
         {"generate": "generate", "wrap": "human_review", "failed": "failed"},
     )
 
-    g.add_edge("human_review", "wrap")
+    g.add_conditional_edges(
+        "human_review",
+        edge_after_human_review,
+        {"generate": "generate", "wrap": "wrap"},
+    )
     g.add_edge("wrap",         "docstring")
     g.add_edge("docstring",    "cleanup")
     g.add_edge("cleanup",      "finalize")
@@ -515,32 +551,49 @@ async def _stream_run(
     initial_state: CellState | None = None,
 ) -> AsyncGenerator[str, None]:
     config = {"configurable": {"thread_id": thread_id}}
-    invoke_kwargs: dict[str, Any] = {"config": config}
-    if initial_state is not None:
-        invoke_kwargs["input"] = initial_state
+    input_val = initial_state
 
-    async for event in _compiled.astream_events(**invoke_kwargs, version="v2"):
-        kind = event["event"]
+    NODE_NAMES = {
+        "inject_schema", "generate", "validate_intent",
+        "execute", "human_review", "wrap", "docstring", "cleanup",
+        "finalize", "failed",
+    }
 
-        if kind == "on_chain_start" and event.get("name") in (
-            "inject_schema", "generate", "validate_intent",
-            "execute", "human_review", "wrap", "docstring", "cleanup",
-            "finalize", "failed",
-        ):
-            yield _sse("stage_start", {"stage": event["name"]})
+    async for chunk in _compiled.astream(input_val, config=config, stream_mode="updates"):
+        if "__interrupt__" in chunk:
+            interrupts = chunk["__interrupt__"]
+            intr = interrupts[0] if interrupts else None
+            intr_value = intr.value if (intr and hasattr(intr, "value")) else {}
 
-        elif kind == "on_chain_end" and "output" in event.get("data", {}):
-            output = event["data"]["output"]
+            snapshot = _compiled.get_state(config)
+            sv = snapshot.values if snapshot else {}
+
+            yield _sse("stage_start", {"stage": "human_review"})
+            yield _sse("log", {"logs": [
+                f"[human_review] interrupt — awaiting human decision "
+                f"({len(sv.get('generated_code', ''))} chars)"
+            ]})
+            yield _sse("paused", {
+                "code": sv.get("generated_code", intr_value.get("code", "") if isinstance(intr_value, dict) else ""),
+                "message": intr_value.get("message", "Human review required.") if isinstance(intr_value, dict) else "Human review required.",
+                "cell_id": sv.get("cell_id", thread_id),
+            })
+            yield _sse("done", {})
+            return
+
+        for node_name, output in chunk.items():
+            if node_name not in NODE_NAMES:
+                continue
             if not isinstance(output, dict):
                 continue
+
+            yield _sse("stage_start", {"stage": node_name})
 
             logs = output.get("stream_log", [])
             if logs:
                 yield _sse("log", {"logs": logs})
 
             if output.get("status") in ("done", "failed"):
-                # on_chain_end의 output은 노드가 새로 반환한 필드만 포함한다.
-                # wrapped_code, docstring 등 누적 state 필드는 체크포인트에서 직접 읽는다.
                 snapshot = _compiled.get_state(config)
                 sv = snapshot.values if snapshot else {}
                 yield _sse("result", {
@@ -552,6 +605,7 @@ async def _stream_run(
                     "output_schema": sv.get("output_schema", {}),
                     "logs": sv.get("stream_log", []),
                 })
+
     yield _sse("done", {})
 
 
@@ -576,6 +630,7 @@ async def run_cell(req: RunCellRequest):
         "exec_error": "",
         "retry_count": 0,
         "status": "running",
+        "hr_action": "",
         "stage": "start",
         "stream_log": [],
     }
@@ -597,19 +652,80 @@ async def stop_cell(cell_id: str):
 
 @app.post("/cell/resume")
 async def resume_cell(req: ResumeCellRequest):
-    """Resume 버튼. updated_code 가 있으면 상태에 주입 후 재개."""
-    config = {"configurable": {"thread_id": req.cell_id}}
-    if req.updated_code is not None:
-        _compiled.update_state(
-            config,
-            {"generated_code": req.updated_code, "exec_ok": True, "exec_error": ""},
-            as_node="human_review",
-        )
+    """Resume 버튼. interrupt()로 중단된 그래프를 Command(resume=...)로 재개한다."""
     return StreamingResponse(
-        _stream_run(req.cell_id, initial_state=None),
+        _stream_resume(req.cell_id, req.updated_code),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+async def _stream_resume(thread_id: str, updated_code: str | None) -> AsyncGenerator[str, None]:
+    from langgraph.types import Command
+
+    config = {"configurable": {"thread_id": thread_id}}
+
+    # 승인이든 재작성이든 항상 명시적 값을 넣어야 LangGraph가 resume으로 인식한다.
+    # 빈 딕셔너리 {} 는 일부 버전에서 interrupt 재트리거를 유발한다.
+    resume_value: dict[str, Any] = {"action": "approved"}
+    if updated_code is not None:
+        resume_value["updated_code"] = updated_code
+        resume_value["action"] = "rewrite"
+
+    NODE_NAMES = {
+        "inject_schema", "generate", "validate_intent",
+        "execute", "human_review", "wrap", "docstring", "cleanup",
+        "finalize", "failed",
+    }
+
+    async for chunk in _compiled.astream(Command(resume=resume_value), config=config, stream_mode="updates"):
+        if "__interrupt__" in chunk:
+            interrupts = chunk["__interrupt__"]
+            intr = interrupts[0] if interrupts else None
+            intr_value = intr.value if (intr and hasattr(intr, "value")) else {}
+
+            snapshot = _compiled.get_state(config)
+            sv = snapshot.values if snapshot else {}
+
+            yield _sse("stage_start", {"stage": "human_review"})
+            yield _sse("log", {"logs": [
+                f"[human_review] interrupt — awaiting human decision "
+                f"({len(sv.get('generated_code', ''))} chars)"
+            ]})
+            yield _sse("paused", {
+                "code": sv.get("generated_code", intr_value.get("code", "") if isinstance(intr_value, dict) else ""),
+                "message": intr_value.get("message", "Human review required.") if isinstance(intr_value, dict) else "Human review required.",
+                "cell_id": sv.get("cell_id", thread_id),
+            })
+            yield _sse("done", {})
+            return
+
+        for node_name, output in chunk.items():
+            if node_name not in NODE_NAMES:
+                continue
+            if not isinstance(output, dict):
+                continue
+
+            yield _sse("stage_start", {"stage": node_name})
+
+            logs = output.get("stream_log", [])
+            if logs:
+                yield _sse("log", {"logs": logs})
+
+            if output.get("status") in ("done", "failed"):
+                snapshot = _compiled.get_state(config)
+                sv = snapshot.values if snapshot else {}
+                yield _sse("result", {
+                    "cell_id": sv.get("cell_id", thread_id),
+                    "status": output["status"],
+                    "code": sv.get("wrapped_code", ""),
+                    "docstring": sv.get("docstring", ""),
+                    "input_schema": sv.get("input_schema", {}),
+                    "output_schema": sv.get("output_schema", {}),
+                    "logs": sv.get("stream_log", []),
+                })
+
+    yield _sse("done", {})
 
 
 @app.get("/cell/state/{cell_id}", response_model=CellResult)

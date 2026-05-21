@@ -522,6 +522,70 @@
     </div>
   </div>
 
+  <!-- HUMAN REVIEW POPUP -->
+  <div id="human-review-overlay" class="hidden">
+    <div id="human-review-modal">
+      <div id="hr-header">
+        <div id="hr-header-left">
+          <span id="hr-badge">⚠ HUMAN REVIEW</span>
+          <span id="hr-cell-label"></span>
+        </div>
+        <button id="hr-close">✕</button>
+      </div>
+
+      <div id="hr-body">
+        <!-- 요약 -->
+        <div id="hr-summary-block">
+          <div class="hr-section-label">AI 요약</div>
+          <div id="hr-summary"></div>
+        </div>
+
+        <!-- 신뢰도 바 -->
+        <div id="hr-confidence-block">
+          <div class="hr-conf-row">
+            <span class="hr-conf-label">AI 신뢰도</span>
+            <span id="hr-conf-value">—</span>
+          </div>
+          <div class="hr-conf-track">
+            <div id="hr-conf-fill"></div>
+          </div>
+        </div>
+
+        <!-- 항목별 검토 -->
+        <div id="hr-items-block">
+          <div class="hr-section-label">항목별 검토</div>
+          <div id="hr-items-list"></div>
+        </div>
+
+        <!-- 리스크 -->
+        <div id="hr-risks-block">
+          <div class="hr-section-label">리스크</div>
+          <div id="hr-risks-list"></div>
+        </div>
+
+        <!-- 생성된 코드 미리보기 -->
+        <div id="hr-code-block">
+          <div class="hr-section-label">생성된 코드</div>
+          <pre id="hr-code-preview"></pre>
+        </div>
+
+        <!-- 수정 요청 메시지 (재작성 선택 시 표시) -->
+        <div id="hr-rewrite-block" class="hidden">
+          <div class="hr-section-label">재작성 요청 메시지</div>
+          <textarea id="hr-rewrite-msg" placeholder="수정 방향을 구체적으로 입력하세요..."></textarea>
+        </div>
+      </div>
+
+      <!-- 액션 버튼 -->
+      <div id="hr-actions">
+        <span id="hr-actions-label">검증 결정:</span>
+        <button id="hr-btn-approve" class="hr-btn hr-btn-approve">✓ 승인</button>
+        <button id="hr-btn-rewrite" class="hr-btn hr-btn-modify">↺ 재작성 요청</button>
+        <button id="hr-btn-reject"  class="hr-btn hr-btn-reject">✕ 거절</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div id="toast" class="hidden">
     <span id="toast-icon">✔</span>

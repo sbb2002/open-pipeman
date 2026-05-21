@@ -318,6 +318,7 @@ function clearCanvasForNew(name) {
   state.selectedEdge   = null;
   state.connectingFrom = null;
   state.running        = false;
+  state.pendingRunOrder = [];
   state.nextId         = 1;
   state.history        = [];
   state.redoStack      = [];
@@ -811,6 +812,7 @@ async function runCell(node, upstreamSchema) {
       const parts = buf.split('\n\n');
       buf = parts.pop();
 
+      let earlyExit = null;
       for (const part of parts) {
         const eventLine = part.split('\n').find(l => l.startsWith('event:'));
         const dataLine  = part.split('\n').find(l => l.startsWith('data:'));
@@ -837,16 +839,20 @@ async function runCell(node, upstreamSchema) {
               };
             }
           }
-          return st;
+          earlyExit = st;
+          break;
         }
 
         if (eventName === 'paused') {
           setNodeStatus(node.id, 'paused');
           state.pausedCell = { nodeId: node.id, code: payload.code };
-          showPausedPanel(node.id, payload.code);
-          return 'paused';
+          showReviewBadge(node.id);
+          showHumanReviewPopup(node.id, payload);
+          earlyExit = 'paused';
+          break;
         }
       }
+      if (earlyExit !== null) return earlyExit;
     }
   } catch (err) {
     console.error('[runCell] error:', err);
@@ -885,62 +891,223 @@ function appendRunLog(msg) {
   console.log('[pipeline]', msg);
 }
 
-/* Human-in-the-loop: 일시정지 패널 표시 */
-function showPausedPanel(nodeId, code) {
-  const existing = document.getElementById('paused-panel');
-  if (existing) existing.remove();
+/* ── Human Review 뱃지 표시 ───────────────────── */
+function showReviewBadge(nodeId) {
+  const el = document.getElementById('node-' + nodeId);
+  if (!el) return;
+  // 기존 뱃지 제거
+  const old = el.querySelector('.cell-review-badge');
+  if (old) old.remove();
 
-  const panel = document.createElement('div');
-  panel.id = 'paused-panel';
-  panel.style.cssText = [
-    'position:fixed', 'bottom:60px', 'right:20px', 'width:420px',
-    'background:var(--bg2)', 'border:1px solid var(--accent)',
-    'border-radius:10px', 'padding:16px', 'z-index:9000',
-    'box-shadow:0 4px 24px rgba(0,0,0,.5)', 'font-family:var(--font-mono,monospace)',
-  ].join(';');
+  el.classList.add('review-pending');
 
-  const title = document.createElement('div');
-  title.textContent = 'Cell #' + nodeId + ' — 코드 검토 (일시정지)';
-  title.style.cssText = 'font-size:11px;color:var(--accent);margin-bottom:10px;letter-spacing:.05em;';
-  panel.appendChild(title);
+  const badge = document.createElement('div');
+  badge.className = 'cell-review-badge';
+  badge.textContent = '!';
+  badge.title = 'Human Review 필요 — 클릭하여 검토';
+  badge.addEventListener('click', e => {
+    e.stopPropagation();
+    const pc = state.pausedCell;
+    if (pc && pc.nodeId === nodeId) {
+      showHumanReviewPopup(nodeId, { code: pc.code });
+    }
+  });
+  el.appendChild(badge);
+}
 
-  const ta = document.createElement('textarea');
-  ta.id    = 'paused-code-editor';
-  ta.value = code || '';
-  ta.style.cssText = [
-    'width:100%', 'height:200px', 'background:var(--bg3)',
-    'color:var(--text)', 'border:1px solid var(--border2)',
-    'border-radius:6px', 'padding:10px', 'font-size:12px',
-    'resize:vertical', 'box-sizing:border-box', 'line-height:1.5',
-  ].join(';');
-  panel.appendChild(ta);
+function removeReviewBadge(nodeId) {
+  const el = document.getElementById('node-' + nodeId);
+  if (!el) return;
+  el.classList.remove('review-pending');
+  const badge = el.querySelector('.cell-review-badge');
+  if (badge) badge.remove();
+}
 
-  const btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:8px;margin-top:10px;justify-content:flex-end;';
+/* ── Human Review 팝업 ────────────────────────── */
+function showHumanReviewPopup(nodeId, payload) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  const overlay = document.getElementById('human-review-overlay');
+  if (!overlay) return;
 
-  const btnResume = document.createElement('button');
-  btnResume.textContent = 'Resume';
-  btnResume.style.cssText = 'padding:6px 16px;background:var(--accent);color:#000;border:none;border-radius:6px;cursor:pointer;font-size:12px;';
-  btnResume.onclick = () => resumeCell(nodeId, null);
+  /* 셀 라벨 */
+  const cellLabel = document.getElementById('hr-cell-label');
+  if (cellLabel) cellLabel.textContent = (node ? node.name : '') + ' — Cell #' + nodeId;
 
-  const btnResumeEdited = document.createElement('button');
-  btnResumeEdited.textContent = '수정 후 Resume';
-  btnResumeEdited.style.cssText = 'padding:6px 16px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:12px;';
-  btnResumeEdited.onclick = () => {
-    const edited = document.getElementById('paused-code-editor').value;
-    resumeCell(nodeId, edited);
-  };
+  /* AI 분석 데이터 채우기 (payload에 analysis 필드가 있으면 사용) */
+  const analysis = payload.analysis || null;
+  _fillHumanReview(analysis, payload.code || '');
 
-  btnRow.appendChild(btnResumeEdited);
-  btnRow.appendChild(btnResume);
-  panel.appendChild(btnRow);
-  document.body.appendChild(panel);
+  /* 코멘트 블록 초기화 */
+  const rewriteBlock = document.getElementById('hr-rewrite-block');
+  const rewriteMsg   = document.getElementById('hr-rewrite-msg');
+  if (rewriteBlock) rewriteBlock.classList.add('hidden');
+  if (rewriteMsg)   rewriteMsg.value = '';
+
+  /* 버튼 이벤트 — cloneNode로 이전 핸들러 완전 제거 후 재바인딩 */
+  function bindBtn(id, handler) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    const fresh = btn.cloneNode(true);
+    btn.replaceWith(fresh);
+    fresh.addEventListener('click', handler);
+    return fresh;
+  }
+
+  bindBtn('hr-close', closeHumanReviewPopup);
+
+  /* ✓ 승인 — 현재 결과물을 그대로 다음 단계로 진행 */
+  bindBtn('hr-btn-approve', () => {
+    closeHumanReviewPopup();
+    removeReviewBadge(nodeId);
+    resumeCell(nodeId, null);
+  });
+
+  /* ↺ 재작성 요청 — 첫 클릭: 코멘트란 열기 / 두 번째 클릭: 코멘트 유무로 전송 판정 */
+  bindBtn('hr-btn-rewrite', () => {
+    const block = document.getElementById('hr-rewrite-block');
+    const msg   = document.getElementById('hr-rewrite-msg');
+    if (!block) return;
+
+    if (block.classList.contains('hidden')) {
+      /* 첫 클릭 → 코멘트란 열기 */
+      block.classList.remove('hidden');
+      if (msg) msg.focus();
+      return;
+    }
+
+    /* 두 번째 클릭 → 코멘트 있으면 재작성 요청 전송, 없으면 란만 닫기 */
+    const comment = msg ? msg.value.trim() : '';
+    if (comment) {
+      closeHumanReviewPopup();
+      removeReviewBadge(nodeId);
+      resumeCell(nodeId, comment);
+    } else {
+      block.classList.add('hidden');
+    }
+  });
+
+  /* ✕ 거절 — 현재 결과물을 거절하고 해당 셀을 failed 상태로 멈춤 */
+  bindBtn('hr-btn-reject', () => {
+    closeHumanReviewPopup();
+    removeReviewBadge(nodeId);
+    setNodeStatus(nodeId, 'failed');
+    appendRunLog('[' + nodeId + '] ✖ rejected by human');
+    finishRun();
+  });
+
+  overlay.classList.remove('hidden');
+
+  /* 오버레이 배경 클릭으로 닫기 */
+  overlay.onclick = e => { if (e.target === overlay) closeHumanReviewPopup(); };
+
+  /* ESC 키 */
+  function onEsc(e) {
+    if (e.key === 'Escape') { closeHumanReviewPopup(); document.removeEventListener('keydown', onEsc); }
+  }
+  document.addEventListener('keydown', onEsc);
+}
+
+function closeHumanReviewPopup() {
+  const overlay = document.getElementById('human-review-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+/* Human Review 팝업 내용 채우기 */
+function _fillHumanReview(analysis, code) {
+  /* 코드 미리보기 */
+  const codeEl = document.getElementById('hr-code-preview');
+  if (codeEl) codeEl.textContent = code || '(코드 없음)';
+
+  /* analysis 없으면 기본 메시지 */
+  const summaryEl = document.getElementById('hr-summary');
+  if (!analysis) {
+    if (summaryEl) summaryEl.textContent = '백엔드에서 human_review 인터럽트가 발생했습니다. 생성된 코드를 검토하고 승인 여부를 결정하세요.';
+    _setConfBar(null);
+    const itemsList = document.getElementById('hr-items-list');
+    if (itemsList) itemsList.innerHTML = '';
+    const risksList = document.getElementById('hr-risks-list');
+    if (risksList) risksList.innerHTML = '';
+    document.getElementById('hr-items-block').style.display = 'none';
+    document.getElementById('hr-risks-block').style.display = 'none';
+    return;
+  }
+
+  /* summary */
+  if (summaryEl) summaryEl.textContent = analysis.summary || '';
+
+  /* confidence bar */
+  _setConfBar(analysis.confidence);
+
+  /* items */
+  const itemsBlock = document.getElementById('hr-items-block');
+  const itemsList  = document.getElementById('hr-items-list');
+  if (itemsList && analysis.items?.length) {
+    itemsList.innerHTML = '';
+    itemsBlock.style.display = '';
+    analysis.items.forEach(it => {
+      const tagClass = { ok: 'hr-tag-ok', warn: 'hr-tag-warn', err: 'hr-tag-err', info: 'hr-tag-info' }[it.status] || 'hr-tag-info';
+      const tagLabel = { ok: '확인됨', warn: '주의', err: '문제', info: '참고' }[it.status] || it.status;
+      const div = document.createElement('div');
+      div.className = 'hr-item';
+      div.innerHTML = `
+        <div class="hr-item-left">
+          ${it.category ? `<span class="hr-item-cat">${it.category}</span>` : ''}
+          <span class="hr-item-text">${it.text}</span>
+        </div>
+        <span class="hr-tag ${tagClass}">${tagLabel}</span>
+      `;
+      itemsList.appendChild(div);
+    });
+  } else if (itemsBlock) {
+    itemsBlock.style.display = 'none';
+  }
+
+  /* risks */
+  const risksBlock = document.getElementById('hr-risks-block');
+  const risksList  = document.getElementById('hr-risks-list');
+  if (risksList && analysis.risks?.length) {
+    risksList.innerHTML = '';
+    risksBlock.style.display = '';
+    analysis.risks.forEach(r => {
+      const tagClass = { high: 'hr-tag-err', mid: 'hr-tag-warn', low: 'hr-tag-info' }[r.level] || 'hr-tag-info';
+      const tagLabel = { high: 'HIGH', mid: 'MID', low: 'LOW' }[r.level] || r.level;
+      const div = document.createElement('div');
+      div.className = 'hr-risk';
+      div.innerHTML = `
+        <span class="hr-tag ${tagClass}">${tagLabel}</span>
+        <span class="hr-risk-text">${r.desc}</span>
+      `;
+      risksList.appendChild(div);
+    });
+  } else if (risksBlock) {
+    risksBlock.style.display = 'none';
+  }
+}
+
+function _setConfBar(confidence) {
+  const confBlock = document.getElementById('hr-confidence-block');
+  const confFill  = document.getElementById('hr-conf-fill');
+  const confValue = document.getElementById('hr-conf-value');
+  if (confidence === null || confidence === undefined) {
+    if (confBlock) confBlock.style.display = 'none';
+    return;
+  }
+  if (confBlock) confBlock.style.display = '';
+  const pct   = Math.round(confidence * 100);
+  const color = confidence >= 0.75 ? 'var(--accent)' : confidence >= 0.5 ? 'var(--orange)' : 'var(--red)';
+  const label = confidence >= 0.75 ? '높음' : confidence >= 0.5 ? '보통' : '낮음';
+  if (confFill)  { confFill.style.width = pct + '%'; confFill.style.background = color; }
+  if (confValue) confValue.textContent = pct + '% — ' + label;
 }
 
 /* Resume 요청 */
 async function resumeCell(nodeId, updatedCode) {
+  /* 혹시 남아있는 구 패널 제거 */
   const panel = document.getElementById('paused-panel');
   if (panel) panel.remove();
+  /* 뱃지·팝업 정리 */
+  removeReviewBadge(nodeId);
+  closeHumanReviewPopup();
 
   const url  = getBackendUrl();
   const body = JSON.stringify({ cell_id: String(nodeId), updated_code: updatedCode });
@@ -962,6 +1129,8 @@ async function resumeCell(nodeId, updatedCode) {
     const decoder = new TextDecoder();
     let   buf     = '';
 
+    let resumeFinished = false;
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -976,22 +1145,68 @@ async function resumeCell(nodeId, updatedCode) {
         let   payload;
         try { payload = JSON.parse(dataLine.replace('data:', '').trim()); } catch { continue; }
         handleSseEvent(nodeId, eventName, payload);
+
         if (eventName === 'result') {
           const st = payload.status === 'done' ? 'done' : 'failed';
           setNodeStatus(nodeId, st);
           if (st === 'done') {
             const n = state.nodes.find(x => x.id === nodeId);
-            if (n) n.outputSchema = payload.output_schema || {};
+            if (n) {
+              n.outputSchema = payload.output_schema || {};
+              n.result = {
+                code:          payload.code          || '',
+                docstring:     payload.docstring     || '',
+                input_schema:  payload.input_schema  || {},
+                output_schema: payload.output_schema || {},
+              };
+            }
           }
+          resumeFinished = true;
+          break;
+        }
+
+        /* 재작성 요청 후 human_review 재진입 시 팝업 재표시 */
+        if (eventName === 'paused') {
+          setNodeStatus(nodeId, 'paused');
+          state.pausedCell = { nodeId: nodeId, code: payload.code };
+          showReviewBadge(nodeId);
+          showHumanReviewPopup(nodeId, payload);
+          resumeFinished = true;  /* finishRun 호출하지 않음 */
           break;
         }
       }
+      if (resumeFinished) break;
     }
   } catch (err) {
     console.error('[resumeCell] error:', err);
     setNodeStatus(nodeId, 'failed');
     showToast('Resume 오류: ' + err.message);
   }
+
+  /* paused 재진입이면 실행 상태 유지하고 대기, 그 외엔 남은 셀 이어서 실행 */
+  const stillPaused = state.nodes.find(n => n.id === nodeId)?.status === 'paused';
+  if (stillPaused) return;
+
+  /* 남은 실행 순서가 있으면 이어서 실행 */
+  const pending = state.pendingRunOrder || [];
+  state.pendingRunOrder = [];
+
+  if (pending.length > 0 && state.running) {
+    for (const nextId of pending) {
+      if (!state.running) break;
+      const nextNode = state.nodes.find(n => n.id === nextId);
+      if (!nextNode) continue;
+      const upstreamSchema = getUpstreamSchema(nextId);
+      const result = await runCell(nextNode, upstreamSchema);
+      if (result === 'paused') {
+        const remainingIdx = pending.indexOf(nextId) + 1;
+        state.pendingRunOrder = pending.slice(remainingIdx);
+        return;
+      }
+      if (result === 'failed') { finishRun(); return; }
+    }
+  }
+
   finishRun();
 }
 
@@ -1014,7 +1229,12 @@ async function runFromNode(startNodeId, singleOnly) {
     const upstreamSchema = getUpstreamSchema(nodeId);
     const result = await runCell(node, upstreamSchema);
 
-    if (result === 'paused') return;
+    if (result === 'paused') {
+      /* 남은 셀 순서를 저장해두고 resume 후 이어서 실행 */
+      const remainingIdx = runOrder.indexOf(nodeId) + 1;
+      state.pendingRunOrder = runOrder.slice(remainingIdx);
+      return;
+    }
     if (result === 'failed') { finishRun(); return; }
   }
 
