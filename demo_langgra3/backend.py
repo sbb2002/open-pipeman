@@ -250,11 +250,11 @@ async def node_execute(state: CellState) -> dict:
     finally:
         await sandbox.kill()  # 항상 소멸 보장
 
-    retry = state.get("exec_retry_count", 0) + (0 if ok else 1)
+    retry = state.get("retry_count", 0) + (0 if ok else 1)
     return {
         "exec_ok": ok,
         "exec_error": error_msg,
-        "exec_retry_count": retry,
+        "retry_count": retry,
         "stage": "execute",
         "stream_log": [f"[execute] {'OK' if ok else 'ERROR — ' + error_msg}"],
     }
@@ -635,5 +635,10 @@ async def get_cell_state(cell_id: str):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    if not E2B_API_KEY:
+        print("⚠️  E2B_API_KEY not set — node_execute will fail")
+    else:
+        print(f"✅ E2B_API_KEY loaded ({E2B_API_KEY[:8]}...)")
+        
     import uvicorn
     uvicorn.run("backend:app", host="0.0.0.0", port=8000, reload=True)
