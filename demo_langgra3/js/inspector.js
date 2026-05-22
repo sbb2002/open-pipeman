@@ -158,8 +158,10 @@ function openInspector(id) {
   document.getElementById('f-input-desc').value  = node.inputDesc;
   document.getElementById('f-output-desc').value = node.outputDesc;
   document.getElementById('f-prompt').value      = node.prompt;
-  document.getElementById('f-websearch').checked = node.webSearch;
-  document.getElementById('f-domains').value     = node.domains;
+  document.getElementById('f-websearch').checked   = node.webSearch;
+  document.getElementById('f-cleanup').checked    = node.allowCleanup  || false;
+  document.getElementById('f-force-review').checked = node.forceReview || false;
+  document.getElementById('f-domains').value      = node.domains;
   document.getElementById('f-memo').value        = node.memo || '';
   domainWrap.classList.toggle('hidden', !node.webSearch);
 
@@ -202,8 +204,10 @@ document.getElementById('apply-btn').addEventListener('click', () => {
     : _sel.value;
 
   node.prompt    = document.getElementById('f-prompt').value.trim();
-  node.webSearch = fWebsearch.checked;
-  node.domains   = document.getElementById('f-domains').value.trim();
+  node.webSearch    = fWebsearch.checked;
+  node.allowCleanup = document.getElementById('f-cleanup').checked;
+  node.forceReview  = document.getElementById('f-force-review').checked;
+  node.domains      = document.getElementById('f-domains').value.trim();
   node.memo      = document.getElementById('f-memo').value.trim();
 
   if (node.type === 'input') {

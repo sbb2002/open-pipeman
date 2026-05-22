@@ -151,10 +151,30 @@ document.querySelectorAll('.apikey-toggle').forEach(btn => {
 });
 
 // Expose getApiKeys() for backend integration
+window.getHRStrictness = () => {
+  const val = parseInt(document.getElementById('hr-strictness-slider')?.value ?? '0', 10);
+  return ['low', 'medium', 'high'][val] || 'low';
+};
+
+const _hrLabels = ['Low', 'Medium', 'High'];
+const _hrDescs  = [
+  'L2+ (Mutating, Network) 자동 리뷰',
+  'L1+ (I/O, Mutating, Network) 자동 리뷰',
+  '모든 레벨 리뷰 (L0 포함)',
+];
+document.getElementById('hr-strictness-slider')?.addEventListener('input', e => {
+  const val = parseInt(e.target.value, 10);
+  const labelEl = document.getElementById('hr-strictness-label');
+  const descEl  = document.getElementById('hr-strictness-desc');
+  if (labelEl) labelEl.textContent = _hrLabels[val] || 'Low';
+  if (descEl)  descEl.textContent  = _hrDescs[val]  || '';
+});
+
 window.getApiKeys = () => ({
   anthropic: document.getElementById('apikey-anthropic')?.value || '',
   google:    document.getElementById('apikey-google')?.value    || '',
   openai:    document.getElementById('apikey-openai')?.value    || '',
+  e2b:       document.getElementById('apikey-e2b')?.value       || '',
   backend:   document.getElementById('apikey-backend')?.value   || 'http://localhost:8000',
 });
 /* ── SETTINGS ─────────────────────────────────── */

@@ -58,6 +58,10 @@ async function runCell(node, upstreamSchema) {
     prompt:          node.prompt || node.label || node.name || '',
     model:           node.model  || '',
     upstream_schema: upstreamSchema,
+    allow_cleanup:   node.allowCleanup  || false,
+    force_review:    node.forceReview   || false,
+    e2b_api_key:     window.getApiKeys?.().e2b || '',
+    hr_strictness:   window.getHRStrictness?.() || 'low',
   });
 
   setNodeStatus(node.id, 'running');

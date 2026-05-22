@@ -53,6 +53,11 @@ class CellState(TypedDict):
     retry_count: int
 
     # ── 흐름 제어 ────────────────────────────────────────────────────────────
+    allow_cleanup: bool                  # True이면 cleanup 노드 포함 그래프로 실행
+    e2b_api_key: str                     # E2B 샌드박스 API 키 (설정 패널에서 주입)
+    force_review: bool                   # Cell Config 체크박스 — 레벨 무관 강제 리뷰
+    hr_strictness: str                   # 'low' | 'medium' | 'high' — 설정 패널 슬라이더
+    code_level: int                      # LLM 판정 권한 레벨: 0=Safe 1=I/O 2=Mutating 3=Network
     status: str                          # pending | running | paused | done | failed
     hr_action: str                       # human_review 결정: '' | 'approved' | 'rewrite'
     stage: str                           # 현재 단계명 (스트리밍용)
@@ -191,25 +196,53 @@ async def node_validate_intent(state: CellState) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 노드 3 : 코드 실행 검증 (E2B 샌드박스)
+# 노드 3 : 코드 실행 검증 (E2B 샌드박스 또는 LLM 정적 분석 폴백)
 # ---------------------------------------------------------------------------
 
-from e2b_code_interpreter import AsyncSandbox
+async def _static_analyze(code: str, model: str) -> tuple[bool, str]:
+    """E2B 키 없을 때 LLM이 코드의 런타임 실행 가능성을 정적 분석."""
+    system = textwrap.dedent("""
+        You are a Python static analysis assistant.
+        Analyze the given Python code and determine whether it can run without runtime errors.
+        Consider: syntax errors, undefined variables, missing imports, obvious type mismatches.
+        Respond ONLY with a JSON object:
+          { "ok": true | false, "reason": "brief explanation if not ok, else empty string" }
+        No markdown, no extra text.
+    """)
+    raw = await _llm(system, f"```python\n{code}\n```", max_tokens=256, model=model)
+    raw_clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+    try:
+        parsed = json.loads(raw_clean)
+        return bool(parsed.get("ok", False)), parsed.get("reason", "")
+    except Exception:
+        # JSON 파싱 실패 시 보수적으로 FAIL 처리
+        return False, f"Static analysis response parse error: {raw[:120]}"
+
 
 async def node_execute(state: CellState) -> dict:
     code = state["generated_code"]
     ok = False
     error_msg = ""
+    api_key = state.get("e2b_api_key", "").strip()
 
-    sandbox = await AsyncSandbox.create()
-    try:
-        result = await sandbox.run_code(code)
-        ok = not result.error
-        error_msg = result.error.value if result.error else ""
-    except Exception as e:
-        error_msg = str(e)
-    finally:
-        await sandbox.kill()
+    if api_key:
+        # ── E2B 샌드박스 실행 ──────────────────────────────────────────────
+        from e2b_code_interpreter import AsyncSandbox
+        sandbox = await AsyncSandbox.create(api_key=api_key)
+        try:
+            result = await sandbox.run_code(code)
+            ok = not result.error
+            error_msg = result.error.value if result.error else ""
+        except Exception as e:
+            error_msg = str(e)
+        finally:
+            await sandbox.kill()
+        mode = "sandbox"
+    else:
+        # ── LLM 정적 분석 폴백 ────────────────────────────────────────────
+        model = state.get("model", MODEL_DEFAULT)
+        ok, error_msg = await _static_analyze(code, model)
+        mode = "static"
 
     retry = state.get("retry_count", 0) + (0 if ok else 1)
     return {
@@ -217,7 +250,7 @@ async def node_execute(state: CellState) -> dict:
         "exec_error": error_msg,
         "retry_count": retry,
         "stage": "execute",
-        "stream_log": [f"[execute] {'OK' if ok else 'ERROR — ' + error_msg}"],
+        "stream_log": [f"[execute:{mode}] {'OK' if ok else 'ERROR — ' + error_msg}"],
     }
 
 
@@ -361,6 +394,63 @@ def edge_after_execute(state: CellState) -> str:
         return "failed"
     if not state["exec_ok"]:
         return "generate"
+    return "classify_level"
+
+
+# ---------------------------------------------------------------------------
+# 권한 레벨 분류 + Human Review 발동 판정
+# ---------------------------------------------------------------------------
+
+async def node_classify_level(state: CellState) -> dict:
+    """
+    LLM이 생성 코드의 권한 요구 레벨을 L0~L3으로 판정한다.
+      L0 — Safe     : 순수 계산, 문자열 처리, 자료구조 변환
+      L1 — I/O      : 파일 읽기, 환경변수 읽기, 로컬 DB 조회
+      L2 — Mutating : 파일 쓰기/수정/이동/삭제, 프로세스 실행
+      L3 — Network  : 외부 API 호출, 웹 요청, 소켓 통신
+    """
+    system = textwrap.dedent("""
+        You are a Python code security classifier.
+        Classify the given code into exactly one permission level:
+          0 = Safe     (pure computation, string/data manipulation, math)
+          1 = I/O      (file read, env var read, local DB query)
+          2 = Mutating (file write/move/delete, subprocess, local DB write)
+          3 = Network  (HTTP requests, sockets, external API calls, email/messaging)
+        Choose the HIGHEST level that applies.
+        Respond ONLY with a JSON object: { "level": <int 0-3>, "reason": "<one sentence>" }
+        No markdown, no extra text.
+    """)
+    model = state.get("model", MODEL_DEFAULT)
+    raw = await _llm(system, f"```python\n{state['generated_code']}\n```", max_tokens=128, model=model)
+    raw_clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+    try:
+        parsed = json.loads(raw_clean)
+        level  = int(parsed.get("level", 0))
+        reason = parsed.get("reason", "")
+    except Exception:
+        level  = 0
+        reason = f"parse error: {raw[:80]}"
+
+    force      = state.get("force_review", False)
+    strictness = state.get("hr_strictness", "low")
+    threshold  = {"low": 2, "medium": 1, "high": 0}.get(strictness, 2)
+    need_review = force or (level >= threshold)
+
+    return {
+        "code_level": level,
+        "stage": "classify_level",
+        "stream_log": [
+            f"[classify_level] L{level} ({reason}) | "
+            f"strictness={strictness} threshold=L{threshold} "
+            f"force={force} → {'REVIEW' if need_review else 'SKIP'}"
+        ],
+        "hr_action": "pending_review" if need_review else "",
+    }
+
+
+def edge_after_classify(state: CellState) -> str:
+    if state.get("hr_action") == "pending_review":
+        return "human_review"
     return "wrap"
 
 
