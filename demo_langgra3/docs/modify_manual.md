@@ -1,12 +1,20 @@
 # 코드 수정 지침 (Script Mode)
 
+## 작업 환경
+
+* **filesystem MCP** 를 통해 프로젝트 파일을 직접 읽고 쓴다. 사용자에게 파일 업로드를 요청하거나, outputs에 복사 후 `present_files`로 전달하는 방식은 더 이상 사용하지 않는다.
+* 프로젝트 루트: `C:\Users\user\Documents\myprojects\open-pipeman\demo_langgra3`
+* **`docs/` 폴더는 작업과 무관한 템플릿/패치내역 보관소다. 명시적 요청이 없는 한 절대 탐색하거나 읽지 말 것.**
+
+---
+
 ## 기본 절차
 
-1. 수정 요청을 받으면 `structure.md`를 참고하여 수정할 파일을 파악하고 사용자에게 업로드를 요청하시오.
-2. 업로드된 파일을 `view`로 읽고 수정 작업을 시작하시오.
+1. 수정 요청을 받으면 `structure.md`를 참고하여 수정할 파일을 파악하시오.
+2. `filesystem:read_text_file`로 해당 파일을 직접 읽고 수정 작업을 시작하시오.
 3. 새 기능/코드가 기존 기능과 충돌할 우려가 있는지 검사하시오. 충돌 우려가 있으면 미리 사용자에게 알리고 확인 후 진행하시오.
-4. `bash_tool`로 Python 스크립트를 실행하여 파일을 수정하시오.
-5. 수정된 파일을 `/mnt/user-data/outputs/`에 복사하고 `present_files`로 제공하시오.
+4. **파일 편집·추가·삭제 전에는 반드시 사용자에게 허락을 받을 것.** 이 규칙은 어떤 상황에서도 생략 불가.
+5. 허락을 받은 뒤 아래 수정 방법 기준에 따라 작업하시오.
 
 ---
 
@@ -14,12 +22,14 @@
 
 | 상황 | 방법 |
 |---|---|
-| 변경 위치가 명확한 1~10곳 | **str.replace 스크립트** |
-| 변경량이 파일 전체의 30% 이상이거나 구조가 크게 바뀌는 경우 | **통파일 재작성** |
+| 변경 위치가 명확한 1~10곳 | **str.replace 스크립트** (`bash_tool`) |
+| 변경량이 파일 전체의 30% 이상이거나 구조가 크게 바뀌는 경우 | **filesystem:write_file 통파일 재작성** |
 
 ---
 
 ## str.replace 스크립트 작성 규칙
+
+파일을 `/home/claude/`에 복사한 뒤 `bash_tool`로 Python str.replace 스크립트를 실행하고, 완료 후 `filesystem:write_file`로 원본 경로에 덮어쓴다.
 
 ### 기본 형태
 
@@ -75,7 +85,7 @@ print("Done. Lines:", src.count('\n'))
 
 ## 통파일 재작성 규칙
 
-* `view`로 파일 전체를 읽은 뒤 수정된 내용 전체를 `cat > 파일경로 << 'EOF' ... EOF` 또는 Python으로 작성할 것.
+* `filesystem:read_text_file`로 파일 전체를 읽은 뒤 수정된 내용 전체를 `filesystem:write_file`로 원본 경로에 직접 저장한다.
 * 수정하지 않는 부분도 빠짐없이 포함해야 함. `# 이하 동일` 등의 생략 표현 절대 금지.
 
 ---
@@ -96,19 +106,10 @@ grep -n "변경된_키워드" /home/claude/파일명
 
 ---
 
-## outputs 복사 및 전달
-
-```bash
-cp /home/claude/파일명 /mnt/user-data/outputs/파일명
-```
-
-`present_files`로 사용자에게 전달. 사용자는 outputs에서 다운로드하여 프로젝트에 덮어쓰면 됨.
-
----
-
 ## 주의사항
 
+* **파일 편집·추가·삭제 전 사용자 허락은 절대 원칙.** `modify_manual.md` 명시 여부와 무관하게 항상 적용.
+* **`docs/` 폴더는 읽지 말 것.** 명시적 요청이 있을 때만 접근.
 * **줄 번호에 의존하지 말 것.** str.replace는 줄 번호가 필요 없음.
-* **파일은 항상 `/home/claude/`에 복사한 뒤 수정할 것.** `/mnt/user-data/uploads/`는 읽기 전용.
-* **assert 실패 시 `view`로 해당 부분을 다시 확인하고 `old` 문자열을 정확히 맞출 것.** 기억이나 추론으로 재시도하지 말 것.
+* **assert 실패 시 `filesystem:read_text_file`로 해당 부분을 다시 확인하고 `old` 문자열을 정확히 맞출 것.** 기억이나 추론으로 재시도하지 말 것.
 * **`patch_applier.py`와 JSON 패치 방식은 더 이상 사용하지 않음.**

@@ -11,7 +11,7 @@
 │   ├── base.css     # CSS 변수, 전역 리셋, #app/#main 레이아웃
 │   ├── cell.css     # 노드 외형·상태, Lasso, 고스트, Human Review 뱃지
 │   ├── inspector.css# Inspector 패널 폼·탭·Result·메모 툴팁
-│   ├── layout.css   # 사이드바, 헤더, 캔버스, 줌 컨트롤, 툴 트레이, 상태바
+│   ├── layout.css   # 사이드바, 헤더, 캔버스, 줌 컨트롤, 툴 트레이, 에러 로그 버튼·패널
 │   ├── overlays.css # 모달, 컨텍스트 메뉴, Confirm, 로드 팝업, 토스트, HR 팝업
 │   └── settings.css # 설정 팝업 (테마·폰트·컬러 피커·API Key)
 └── js/
@@ -51,3 +51,14 @@ state.js
 ```
 
 > **runner.js ↔ hitl.js** 는 서로를 호출하지만, 전역 스크립트 특성상 로드 완료 후 호출되므로 런타임 오류 없음.
+
+---
+
+## UI 변경 이력 (주요)
+
+| 항목 | 변경 내용 |
+|---|---|
+| `#statusbar` | **제거됨.** 하단 상태바 영역 전체 삭제 |
+| `#status-ws` | **제거됨.** WS 연결 상태 표시 span (JS 참조 없던 dead element) |
+| `#status-validity` | **이동됨.** statusbar → 캔버스 좌하단 플로팅 버튼(`#error-log-btn-wrap`) |
+| `#error-panel` | **재배치됨.** 전체 하단 슬라이드 → 에러 로그 버튼 위에서 올라오는 팝업 (width: 360px, left: 14px, bottom: 50px) |
