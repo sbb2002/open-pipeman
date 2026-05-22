@@ -354,66 +354,70 @@
 
 #canvas-hint.hidden { opacity: 0; }
 
-/* ── STATUSBAR ───────────────────────────────── */
-#statusbar {
+/* ── ERROR LOG BUTTON (캔버스 좌하단) ────────── */
+#error-log-btn-wrap {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 52;
+}
+
+#status-validity {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
+  gap: 6px;
+  padding: 4px 10px;
   background: var(--bg2);
-  border-top: 1px solid var(--border);
-  font-family: var(--mono);
-  font-size: 10px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
   color: var(--text3);
-  letter-spacing: 0.06em;
-}
-
-#status-validity { color: var(--text3); }
-#status-validity.error { color: var(--red); }
-#status-validity.running { color: var(--blue); }
-
-/* status-validity가 error일 때 클릭 가능한 버튼처럼 */
-/* status-validity가 error일 때 클릭 가능한 버튼처럼 */
-.status-validity-btn {
-  background: none;
-  border: none;
-  padding: 0;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.06em;
-  color: inherit;
-  cursor: default;
-  outline: none;
-}
-.status-validity-btn:focus,
-.status-validity-btn:focus-visible {
-  background: none;
-  outline: none;
-  box-shadow: none;
-}
-.status-validity-btn.error {
   cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transition: all 0.15s;
+  outline: none;
 }
-.status-validity-btn.error:hover { opacity: 0.8; }
+#status-validity:hover {
+  background: var(--bg4);
+  color: var(--text);
+}
+#status-validity.error {
+  color: var(--red);
+  border-color: var(--red);
+}
+#status-validity.error:hover {
+  background: rgba(248,113,113,0.1);
+}
+#status-validity.running {
+  color: var(--blue);
+}
+
 /* ── ERROR SLIDE PANEL ────────────────────────── */
 #error-panel {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
+  bottom: 50px;
+  left: 14px;
+  width: 360px;
+  z-index: 51;
   background: var(--bg2);
-  border-top: 1px solid var(--red);
+  border: 1px solid var(--red);
+  border-radius: 10px;
   box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
-  transform: translateY(100%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s;
   max-height: 40vh;
   display: flex;
   flex-direction: column;
 }
-#error-panel.open { transform: translateY(0); }
+#error-panel.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
 
 #error-panel-header {
   display: flex;
@@ -471,7 +475,7 @@
   margin-top: 1px;
 }
 
-/* error-panel의 absolute 기준점 */
+/* error-panel · error-log-btn의 absolute 기준점 */
 #main { position: relative; }
 
 /* ── ZOOM CONTROLS ────────────────────────────── */
