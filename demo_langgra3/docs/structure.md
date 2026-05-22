@@ -1,18 +1,53 @@
+# 프로젝트 구조
+
+## 파일 트리
+```
 .
-├── index.html          # 앱의 메인 엔트리 포인트: 전체 레이아웃 구조(사이드바, 캔버스, 인스펙터) 정의, Inspector에 Config/Result 탭 구조 포함, 캔버스 좌상단 툴 트레이(#tool-tray: 커서/손바닥 모드 전환 버튼) 포함, 모달/컨텍스트 메뉴/툴팁 등 오버레이 요소의 스켈레톤 포함. Human Review 팝업(#human-review-overlay: 요약·신뢰도·항목별 검토·코드 미리보기·승인/재작성/거절 버튼) 스켈레톤 포함. 모든 CSS/JS 리소스 로드 담당
-├── backend.py          # FastAPI 기반 백엔드 실행 엔진: LangGraph DAG로 inject_schema → generate → validate_intent → execute → human_review → wrap → docstring → cleanup → finalize 9단계 파이프라인 실행. human_review 노드는 LangGraph interrupt()로 실제 중단하고 resume 시 hr_action('approved'|'rewrite')으로 wrap 또는 generate 분기(edge_after_human_review). CellState에 hr_action 필드 포함. _stream_run/_stream_resume 모두 astream(stream_mode="updates") + __interrupt__ 감지 방식으로 paused SSE 전송. Command(resume={action:...}) 로 재개. Anthropic/Ollama 모델 분기, MemorySaver 체크포인트. 엔드포인트: POST /cell/run, /cell/stop/{id}, /cell/resume, GET /cell/state/{id}
-├── css/                # 스타일시트 디렉토리
-│   ├── base.css        # 전역 스타일 정의: 웹폰트(JetBrains Mono, Space Grotesk) 로드, 색상/크기 변수(CSS Variables), 기본 리셋 및 스크롤바 디자인, 전체 레이아웃 구조(#app, #main) 설정
-│   ├── cell.css        # 노드(Cell) 스타일 및 상태 정의: 개별 노드의 외형, 상태별 컬러(Running, Done, Failed), 호버/선택 효과, 멀티 선택 및 드래그 박스(Lasso), 고스트 노드 프리뷰, 입력/출력(I/O) 라벨 디자인 및 애니메이션 처리. Human Review 대기 상태 스타일(.cell-review-badge: 우상단 ! 뱃지·펄스 애니메이션, .review-pending: 빨간 테두리) 포함
-│   ├── inspector.css   # Inspector 패널 스타일: Config/Result 탭 전환 UI(.inspector-tab, #inspector-tabs), Result 탭 콘텐츠(#inspector-result, .result-code-block, .result-copy-btn), 폼 요소(입력창, 선택창, 체크박스), 적용 버튼 디자인 및 메모 툴팁 스타일링 담당
-│   ├── layout.css      # 메인 UI 프레임워크 스타일: 사이드바(로고, 프로젝트 목록, 셀 팔레트), 헤더(프로젝트 관리 및 실행 버튼), 캔버스(배경 패턴, 줌 컨트롤, 툴 트레이(#tool-tray/.tool-btn)), 상태바 및 에러 슬라이드 패널 디자인 담당
-│   ├── overlays.css    # 최상위 레이어 요소 스타일: 범용 모달, 우클릭 컨텍스트 메뉴, 확인(Confirm) 다이얼로그, 프로젝트 로드 팝업(검색 및 드롭존 포함), 알림 토스트(Toast), Human Review 팝업(#human-review-modal: 헤더·요약·신뢰도 바·항목 태그·리스크·코드 미리보기·액션 버튼 스타일, .hr-tag-ok/warn/err/info, .hr-btn-approve/modify/reject)의 디자인 및 애니메이션 담당
-│   └── settings.css    # 앱 설정 및 테마 스타일: 사이드바 로고 영역, 프로젝트 추가 버튼, 최근 항목 리스트(배지 및 메타정보), 노드 팔레트(드래그 가능한 아이템), 헤더 액션 버튼(실행/중지/저장/로드) 및 줌 컨트롤 인터페이스 디자인 담당
-└── js/                 # 자바스크립트 디렉토리
-    ├── canvas.js       # 캔버스 코어 및 노드 조작 로직: 노드 생성(Create/Clone) 및 삭제, 드래그 앤 드롭 팔레트 인터페이스, 베지에 곡선 기반 엣지(연결선) 렌더링 담당. 툴 모드(_toolMode) 관리: 커서 모드(노드 드래그·라소 선택)와 손바닥 모드(캔버스 pan, state.panX/Y로 offset 추적, applyTransform() 호출로 translate+scale 통합 적용) 전환. 모든 좌표 역변환에 pan offset 반영((clientX - wrap.left - panX) / zoom 공식 통일), drawEdges()에서 각 셀의 getBoundingClientRect()로 실제 화면 좌표를 읽어 연결선을 셀과 정확히 동기화
-    ├── edit.js         # 편집 및 상호작용 로직: 우클릭 컨텍스트 메뉴(Context Menu) 생성 및 액션 정의, 노드 간 연결(Connect) 처리, 키보드 단축키(복사/붙여넣기·input/output 타입 제외, 삭제, 실행), 실행 로그 창 제어 및 다중 선택 로직 담당. applyTransform()(panX/Y + zoom을 translate+scale로 통합 적용, pan·zoom 변경 시 단일 진입점), applyZoom(), getEdgeAtPoint()(getBoundingClientRect 기반 엣지 히트테스트, drawEdges()와 동일한 좌표계 사용) 포함
-    ├── inspector.js    # Inspector 패널 로직: Config/Result 탭 전환, Ollama 커스텀 모델 복원 및 저장, 노드 클릭 시 설정 패널 열기/닫기, Apply 로직, 파이프라인 유효성 검사(validatePipeline). Run 중 실시간 스트리밍 표시(openResultTabStreaming, streamResultTab), 완료 결과 표시(openResultTab, _fillResultTab) 담당
-    ├── pipeline.js     # 프로젝트 스토리지, 앱 초기화 및 실행 엔진 로직: localStorage 기반 프로젝트 CRUD, 프로젝트 자동 저장 및 복원, 앱 시작 시 초기 상태 설정 및 입출력 셀 자동 생성. Run/Stop 버튼 이벤트 처리, 위상 정렬(Kahn's) 기반 셀 순차 실행, 백엔드 SSE 스트리밍 수신(runCell), 결과 저장(node.result) 담당. Human Review HITL: showReviewBadge()(셀에 ! 뱃지 부착), showHumanReviewPopup()/_fillHumanReview()/_setConfBar()(팝업 렌더링), resumeCell()(Command(resume) 전송 및 SSE 수신, paused 재진입 시 팝업 재표시). paused 발생 시 잔여 실행 순서를 state.pendingRunOrder에 저장하고 resumeCell 완료 후 이어서 실행
-    ├── settings.js     # 사용자 정의 설정 및 테마 로직: 전역 설정 상태(폰트, 크기, 색상, 테마) 관리, 실시간 스타일 반영(Live Preview), 커스텀 컬러 피커(HSV 기반) 구현 및 배경 패턴 설정 담당
-    ├── state.js        # 앱 전역 상태 및 DOM 참조 관리: 노드/엣지 데이터 구조, 선택 및 드래그 상태, 줌 레벨, 캔버스 pan offset(panX/Y), 히스토리(Undo/Redo), 클립보드 등 핵심 상태 객체(state)와 주요 UI 요소의 DOM 참조 정의. state.pendingRunOrder(paused 후 잔여 실행 순서 임시 저장, pipeline.js에서 동적 관리)는 state.js에 선언되지 않고 pipeline.js에서 직접 할당됨
-    └── ui.js           # 공통 UI 컴포넌트 및 유틸리티: 모달(Modal) 및 확인(Confirm) 다이얼로그 제어, 노드 간 데이터 자동 복사(I/O Sync), 노드 메모(Memo) 툴팁 표시 및 위치 계산, 토스트 알림 로직 담당
+├── index.html       # 전체 레이아웃 골격 + 모든 CSS/JS 로드 (JS 로드 순서 = 의존 순서)
+├── api.py           # FastAPI 엔드포인트 + SSE 스트리밍. 진입점: uvicorn api:app
+├── graph.py         # LangGraph DAG 조립 + 컴파일 (_compiled 인스턴스 생성)
+├── nodes.py         # CellState, _llm(), 9개 노드 함수, 조건부 엣지 정의
+├── css/
+│   ├── base.css     # CSS 변수, 전역 리셋, #app/#main 레이아웃
+│   ├── cell.css     # 노드 외형·상태, Lasso, 고스트, Human Review 뱃지
+│   ├── inspector.css# Inspector 패널 폼·탭·Result·메모 툴팁
+│   ├── layout.css   # 사이드바, 헤더, 캔버스, 줌 컨트롤, 툴 트레이, 상태바
+│   ├── overlays.css # 모달, 컨텍스트 메뉴, Confirm, 로드 팝업, 토스트, HR 팝업
+│   └── settings.css # 설정 팝업 (테마·폰트·컬러 피커·API Key)
+└── js/
+    ├── state.js     # 전역 state 객체 + DOM 참조. 모든 JS의 기반
+    ├── canvas.js    # 노드 생성·렌더링·드래그·엣지 그리기·툴 모드
+    ├── edit.js      # 컨텍스트 메뉴, 연결, 단축키, applyTransform(), 줌/pan
+    ├── inspector.js # Inspector 패널: 탭 전환, Apply, validatePipeline(), 결과 표시
+    ├── ui.js        # showModal(), showConfirm(), I/O Sync, 메모 툴팁
+    ├── settings.js  # 테마·폰트·컬러 설정, Live Preview, HSV 컬러 피커
+    ├── store.js     # localStorage CRUD: storeGet/Set/Delete, snapshot, relativeTime
+    ├── project-ui.js# 프로젝트 UI + 앱 초기화: 사이드바, 로드 팝업, loadPipeline()
+    ├── runner.js    # 실행 엔진: topoSort(), runCell(), runFromNode(), setNodeStatus()
+    └── hitl.js      # Human Review: 뱃지, 팝업, resumeCell()
+```
+
+---
+
+## 의존성 맵
+
+### Python
+```
+nodes.py  →  graph.py  →  api.py
+```
+
+### JavaScript (로드 순서 엄수)
+```
+state.js
+  ├─▶ canvas.js
+  ├─▶ edit.js
+  ├─▶ inspector.js
+  ├─▶ ui.js
+  ├─▶ settings.js
+  └─▶ store.js
+        └─▶ project-ui.js
+                └─▶ runner.js
+                       └─▶ hitl.js
+```
+
+> **runner.js ↔ hitl.js** 는 서로를 호출하지만, 전역 스크립트 특성상 로드 완료 후 호출되므로 런타임 오류 없음.
