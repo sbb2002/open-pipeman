@@ -1,14 +1,16 @@
 # nodes.py
 # Visual AI Pipeline Builder — LangGraph 노드 정의
-# 의존: pip install langgraph anthropic openai e2b-code-interpreter python-dotenv
+# 의존: pip install langgraph anthropic openai e2b-code-interpreter python-dotenv aiohttp
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import textwrap
 from typing import Any
 
+import aiohttp
 import anthropic
 from openai import AsyncOpenAI
 from langgraph.types import interrupt
@@ -62,6 +64,12 @@ class CellState(TypedDict):
     hr_action: str                       # human_review 결정: '' | 'approved' | 'rewrite'
     stage: str                           # 현재 단계명 (스트리밍용)
     stream_log: Annotated[list[str], lambda a, b: a + b]
+
+    # ── 도구 탐색 (Web Search) ───────────────────────────────────────────────
+    max_retries: int                     # 설정 패널 슬라이더 — 0=no limit
+    allow_web_search: bool               # Cell Config 체크박스 — 도구 탐색 활성화
+    tool_hint: str                       # search_tools 노드가 생성한 라이브러리/모델 힌트
+    license_review: bool                 # non-permissive 라이선스 발견 시 True, HR 트리거
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +144,169 @@ async def node_inject_schema(state: CellState) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 노드 0-1 : 도구 탐색 (Web Search -- PyPI + HuggingFace)
+# ---------------------------------------------------------------------------
+
+# permissive 라이선스 목록
+_PERMISSIVE_LICENSES = {
+    "mit", "apache-2.0", "apache 2.0", "bsd-2-clause", "bsd-3-clause",
+    "isc", "unlicense", "cc0-1.0", "cc0", "wtfpl", "zlib", "mpl-2.0",
+    "lgpl-2.1", "lgpl-3.0",
+}
+
+
+async def _fetch_pypi_info(package: str) -> dict:
+    """PyPI JSON API로 패키지 메타데이터(버전, 라이선스, 요약)를 가져온다."""
+    url = f"https://pypi.org/pypi/{package}/json"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status != 200:
+                    return {}
+                data = await resp.json()
+        info = data.get("info", {})
+        return {
+            "name":    info.get("name", package),
+            "version": info.get("version", ""),
+            "license": info.get("license", "") or "",
+            "summary": info.get("summary", ""),
+            "source":  "pypi",
+        }
+    except Exception:
+        return {}
+
+
+async def _fetch_hf_info(model_id: str) -> dict:
+    """HuggingFace Hub API로 모델 메타데이터(라이선스, 태스크)를 가져온다."""
+    url = f"https://huggingface.co/api/models/{model_id}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status != 200:
+                    return {}
+                data = await resp.json()
+        tags = data.get("tags", [])
+        license_tag = next((t.replace("license:", "") for t in tags if t.startswith("license:")), "")
+        return {
+            "name":    model_id,
+            "license": license_tag,
+            "tags":    tags,
+            "source":  "huggingface",
+        }
+    except Exception:
+        return {}
+
+
+def _is_permissive(license_str: str) -> bool:
+    return license_str.strip().lower() in _PERMISSIVE_LICENSES
+
+
+async def node_search_tools(state: CellState) -> dict:
+    """
+    프롬프트를 분석해 적합한 PyPI 패키지 / HuggingFace 모델을 탐색한다.
+    LLM 추천 -> PyPI/HF API 라이선스 검증 -> tool_hint 생성.
+    non-permissive 라이선스 발견 시 license_review=True (HR 트리거).
+    """
+    model = state.get("model", MODEL_DEFAULT)
+
+    # Step 1: LLM이 후보 패키지/모델 추천
+    system = textwrap.dedent("""
+        You are a Python tooling advisor for a code-generation pipeline.
+        Given a task description, recommend the best existing PyPI packages or
+        HuggingFace models that would make implementation faster and more optimal.
+        Respond ONLY with a JSON object:
+        {
+          "pypi": ["package1", "package2"],
+          "huggingface": ["org/model1", "org/model2"],
+          "rationale": "one sentence explaining why these tools fit"
+        }
+        - List at most 3 pypi packages and 2 huggingface models.
+        - If no specific tool is needed, return empty lists.
+        - No markdown, no extra text.
+    """)
+    raw = await _llm(system, state["prompt"], max_tokens=512, model=model)
+    raw_clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+
+    try:
+        suggestions = json.loads(raw_clean)
+    except Exception:
+        return {
+            "tool_hint":      "",
+            "license_review": False,
+            "stage":          "search_tools",
+            "stream_log":     ["[search_tools] candidates=pypi=[] hf=[] (suggestion parse failed)"],
+        }
+
+    pypi_candidates = suggestions.get("pypi", [])[:3]
+    hf_candidates   = suggestions.get("huggingface", [])[:2]
+    rationale       = suggestions.get("rationale", "")
+
+    if not pypi_candidates and not hf_candidates:
+        return {
+            "tool_hint":      "",
+            "license_review": False,
+            "stage":          "search_tools",
+            "stream_log":     ["[search_tools] candidates=pypi=[] hf=[] (no tools suggested)"],
+        }
+
+    # Step 2: PyPI + HF API 병렬 조회
+    pypi_tasks = [_fetch_pypi_info(p) for p in pypi_candidates]
+    hf_tasks   = [_fetch_hf_info(m)   for m in hf_candidates]
+    all_results = await asyncio.gather(*pypi_tasks, *hf_tasks)
+
+    pypi_results = [r for r in all_results[:len(pypi_tasks)] if r]
+    hf_results   = [r for r in all_results[len(pypi_tasks):] if r]
+
+    # Step 3: 라이선스 검증
+    non_permissive = []
+    for item in pypi_results + hf_results:
+        lic = item.get("license", "")
+        if lic and not _is_permissive(lic):
+            non_permissive.append(f"{item['name']} ({lic})")
+
+    license_review = len(non_permissive) > 0
+
+    # Step 4: tool_hint 조합
+    hint_lines = [f"Rationale: {rationale}"] if rationale else []
+    for p in pypi_results:
+        hint_lines.append(
+            f"[PyPI] {p['name']} {p.get('version','')} -- {p.get('summary','')} "
+            f"(license: {p.get('license','unknown')})"
+        )
+    for h in hf_results:
+        hint_lines.append(
+            f"[HuggingFace] {h['name']} (license: {h.get('license','unknown')}, tags: {h.get('tags',[])})"
+        )
+    if non_permissive:
+        hint_lines.append(
+            f"WARNING: Non-permissive license detected: {', '.join(non_permissive)} -- human review required."
+        )
+
+    tool_hint = "\n".join(hint_lines)
+
+    log_parts = [
+        f"[search_tools] candidates: pypi={pypi_candidates} hf={hf_candidates}",
+        f"[search_tools] confirmed:  pypi={[p['name'] for p in pypi_results]} hf={[h['name'] for h in hf_results]}",
+    ]
+    if non_permissive:
+        log_parts.append(f"[search_tools] non-permissive: {non_permissive} -> license_review=True")
+
+    return {
+        "tool_hint":      tool_hint,
+        "license_review": license_review,
+        "stage":          "search_tools",
+        "stream_log":     log_parts,
+    }
+
+
+def edge_after_inject(state: CellState) -> str:
+    """web search 활성화 여부에 따라 search_tools 또는 generate로 분기."""
+    if state.get("allow_web_search", False):
+        return "search_tools"
+    return "generate"
+
+
+# ---------------------------------------------------------------------------
 # 노드 1 : 코드 생성
 # ---------------------------------------------------------------------------
 
@@ -153,6 +324,10 @@ async def node_generate(state: CellState) -> dict:
     user = state["prompt"]
     if feedback:
         user += f"\n\n[PREVIOUS FEEDBACK — fix this]\n{feedback}"
+
+    tool_hint = state.get("tool_hint", "")
+    if tool_hint:
+        user += f"\n\n[RECOMMENDED TOOLS — prefer these over manual implementation]\n{tool_hint}"
 
     model = state.get("model", MODEL_DEFAULT)
     raw = await _llm(system, user, model=model)
@@ -191,7 +366,7 @@ async def node_validate_intent(state: CellState) -> dict:
         "intent_feedback": feedback,
         "retry_count": retry,
         "stage": "validate_intent",
-        "stream_log": [f"[validate_intent] {'PASS' if ok else 'FAIL — ' + feedback}"],
+        "stream_log": [f"[validate_intent] {'PASS' if ok else 'FAIL -- ' + feedback}"],
     }
 
 
@@ -250,7 +425,7 @@ async def node_execute(state: CellState) -> dict:
         "exec_error": error_msg,
         "retry_count": retry,
         "stage": "execute",
-        "stream_log": [f"[execute:{mode}] {'OK' if ok else 'ERROR — ' + error_msg}"],
+        "stream_log": [f"[execute:{mode}] {'OK' if ok else 'ERROR -- ' + error_msg}"],
     }
 
 
@@ -370,10 +545,12 @@ async def node_finalize(state: CellState) -> dict:
 async def node_failed(state: CellState) -> dict:
     """재시도 상한 초과 시 셀을 FAILED 상태로 전이한다."""
     reason = state.get("exec_error") or state.get("intent_feedback") or "unknown"
+    max_r = state.get("max_retries", MAX_RETRIES)
+    limit_str = "no-limit" if max_r == 0 else str(max_r)
     return {
         "status": "failed",
         "stage": "failed",
-        "stream_log": [f"[failed] max_retries({MAX_RETRIES}) exceeded. last_error={reason}"],
+        "stream_log": [f"[failed] max_retries({limit_str}) exceeded. last_error={reason}"],
     }
 
 
@@ -382,7 +559,8 @@ async def node_failed(state: CellState) -> dict:
 # ---------------------------------------------------------------------------
 
 def edge_after_intent(state: CellState) -> str:
-    if state["retry_count"] >= MAX_RETRIES:
+    max_r = state.get("max_retries", MAX_RETRIES)
+    if max_r > 0 and state["retry_count"] >= max_r:
         return "failed"
     if not state["intent_ok"]:
         return "generate"
@@ -390,7 +568,8 @@ def edge_after_intent(state: CellState) -> str:
 
 
 def edge_after_execute(state: CellState) -> str:
-    if state["retry_count"] >= MAX_RETRIES:
+    max_r = state.get("max_retries", MAX_RETRIES)
+    if max_r > 0 and state["retry_count"] >= max_r:
         return "failed"
     if not state["exec_ok"]:
         return "generate"
@@ -442,7 +621,7 @@ async def node_classify_level(state: CellState) -> dict:
         "stream_log": [
             f"[classify_level] L{level} ({reason}) | "
             f"strictness={strictness} threshold=L{threshold} "
-            f"force={force} → {'REVIEW' if need_review else 'SKIP'}"
+            f"force={force} -> {'REVIEW' if need_review else 'SKIP'}"
         ],
         "hr_action": "pending_review" if need_review else "",
     }
@@ -450,6 +629,8 @@ async def node_classify_level(state: CellState) -> dict:
 
 def edge_after_classify(state: CellState) -> str:
     if state.get("hr_action") == "pending_review":
+        return "human_review"
+    if state.get("license_review", False):
         return "human_review"
     return "wrap"
 
@@ -466,9 +647,20 @@ async def node_human_review(state: CellState) -> dict:
     """
     code = state.get("generated_code", "")
 
+    license_review = state.get("license_review", False)
+    tool_hint      = state.get("tool_hint", "")
+    if license_review:
+        message = (
+            "Non-permissive license detected in recommended tools.\n"
+            + tool_hint
+            + "\n\nPlease review and approve or request a rewrite."
+        )
+    else:
+        message = "Human review required."
+
     resume_payload = interrupt({
         "code": code,
-        "message": "Human review required.",
+        "message": message,
     })
 
     comment = None

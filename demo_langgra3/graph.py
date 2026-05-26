@@ -6,10 +6,11 @@ from langgraph.graph import END, START, StateGraph
 
 from nodes import (
     CellState,
-    node_inject_schema, node_generate, node_validate_intent,
+    node_inject_schema, node_search_tools, node_generate, node_validate_intent,
     node_execute, node_classify_level, node_human_review, node_wrap, node_docstring,
     node_cleanup, node_finalize, node_failed,
-    edge_after_intent, edge_after_execute, edge_after_classify, edge_after_human_review,
+    edge_after_inject, edge_after_intent, edge_after_execute,
+    edge_after_classify, edge_after_human_review,
 )
 
 # ---------------------------------------------------------------------------
@@ -20,6 +21,7 @@ def build_graph(allow_cleanup: bool = False) -> StateGraph:
     g = StateGraph(CellState)
 
     g.add_node("inject_schema",   node_inject_schema)
+    g.add_node("search_tools",    node_search_tools)
     g.add_node("generate",        node_generate)
     g.add_node("validate_intent", node_validate_intent)
     g.add_node("execute",         node_execute)
@@ -30,9 +32,17 @@ def build_graph(allow_cleanup: bool = False) -> StateGraph:
     g.add_node("finalize",        node_finalize)
     g.add_node("failed",          node_failed)
 
-    g.add_edge(START,            "inject_schema")
-    g.add_edge("inject_schema",  "generate")
-    g.add_edge("generate",       "validate_intent")
+    g.add_edge(START, "inject_schema")
+
+    # inject_schema -> search_tools(if allow_web_search) or generate
+    g.add_conditional_edges(
+        "inject_schema",
+        edge_after_inject,
+        {"search_tools": "search_tools", "generate": "generate"},
+    )
+
+    g.add_edge("search_tools", "generate")
+    g.add_edge("generate",     "validate_intent")
 
     g.add_conditional_edges(
         "validate_intent",

@@ -54,14 +54,15 @@ async function runCell(node, upstreamSchema) {
   const cellId = String(node.id);
 
   const body = JSON.stringify({
-    cell_id:         cellId,
-    prompt:          node.prompt || node.label || node.name || '',
-    model:           node.model  || '',
-    upstream_schema: upstreamSchema,
-    allow_cleanup:   node.allowCleanup  || false,
-    force_review:    node.forceReview   || false,
-    e2b_api_key:     window.getApiKeys?.().e2b || '',
-    hr_strictness:   window.getHRStrictness?.() || 'low',
+    cell_id:          cellId,
+    prompt:           node.prompt || node.label || node.name || '',
+    model:            node.model  || '',
+    upstream_schema:  upstreamSchema,
+    allow_cleanup:    node.allowCleanup    || false,
+    force_review:     node.forceReview     || false,
+    hr_strictness:    window.getHRStrictness?.() || 'low',
+    allow_web_search: node.webSearch       || false,
+    max_retries:      window.getMaxRetries?.() ?? 3,
   });
 
   setNodeStatus(node.id, 'running');

@@ -72,7 +72,6 @@
           <!-- ── GENERAL TAB ── -->
           <div class="settings-tab-panel active" id="tab-general">
 
-
           <!-- THEME -->
           <div class="settings-section">
             <div class="settings-section-label">THEME</div>
@@ -317,6 +316,28 @@
                   <b>L2 — Mutating</b>: 파일 쓰기/삭제, 프로세스 실행<br>
                   <b>L3 — Network</b>: 외부 API 호출, 소켓 통신
                 </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-label">CODE REVIEW</div>
+              <div class="field-group">
+                <label>Max Retries</label>
+                <input type="range" id="max-retries-slider" min="0" max="4" step="1" value="0"
+                  style="width:100%;accent-color:var(--accent)"/>
+                <div class="retry-labels-row">
+                  <span class="retry-label">3</span>
+                  <span class="retry-label">5</span>
+                  <span class="retry-label">10</span>
+                  <span class="retry-label">20</span>
+                  <span class="retry-label" style="text-align: right;">No<br>Limit</span>
+                </div>
+                <div class="retry-input-row">
+                  <span class="apikey-hint">직접 입력:</span>
+                  <input type="number" id="max-retries-input" min="1" value="3"
+                    class="retry-number-input"/>
+                </div>
+                <span class="apikey-hint" id="max-retries-desc">LLM 코드 생성 최대 재시도 횟수</span>
               </div>
             </div>
 

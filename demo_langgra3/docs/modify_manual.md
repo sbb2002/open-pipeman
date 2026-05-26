@@ -2,7 +2,7 @@
 
 ## 작업 환경
 
-* **filesystem MCP** 를 통해 프로젝트 파일을 직접 읽고 쓴다. 사용자에게 파일 업로드를 요청하거나, outputs에 복사 후 `present_files`로 전달하는 방식은 더 이상 사용하지 않는다.
+* **filesystem MCP** 를 통해 프로젝트 파일을 직접 읽고 쓴다.
 * 프로젝트 루트: `C:\Users\user\Documents\myprojects\open-pipeman\demo_langgra3`
 * **`docs/` 폴더는 작업과 무관한 템플릿/패치내역 보관소다. 명시적 요청이 없는 한 절대 탐색하거나 읽지 말 것.**
 
@@ -87,6 +87,16 @@ print("Done. Lines:", src.count('\n'))
 
 * `filesystem:read_text_file`로 파일 전체를 읽은 뒤 수정된 내용 전체를 `filesystem:write_file`로 원본 경로에 직접 저장한다.
 * 수정하지 않는 부분도 빠짐없이 포함해야 함. `# 이하 동일` 등의 생략 표현 절대 금지.
+
+### write_file 타임아웃 시 폴백
+
+`filesystem:write_file`이 타임아웃으로 실패한 경우, 아래 절차를 따른다:
+
+1. `/home/claude/파일명`에 수정된 전체 내용이 이미 저장되어 있는 상태를 확인한다.
+2. `present_files`로 해당 파일을 사용자에게 전달한다.
+3. 사용자가 직접 해당 파일을 프로젝트 원본 경로에 덮어쓴다.
+
+> MCP write_file 타임아웃은 파일 크기가 클 때 발생하는 경향이 있다. 작업 전 `/home/claude/`에 항상 패치된 결과물을 보관해두면 타임아웃 발생 시 즉시 폴백할 수 있다.
 
 ---
 

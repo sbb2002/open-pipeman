@@ -43,6 +43,11 @@ class RunCellRequest(BaseModel):
     prompt: str
     model: str = MODEL_DEFAULT
     upstream_schema: dict[str, Any] = Field(default_factory=dict)
+    allow_cleanup: bool = False
+    force_review: bool = False
+    hr_strictness: str = "low"
+    allow_web_search: bool = False
+    max_retries: int = 3
 
 
 class ResumeCellRequest(BaseModel):
@@ -66,7 +71,7 @@ def _sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 NODE_NAMES = {
-    "inject_schema", "generate", "validate_intent",
+    "inject_schema", "search_tools", "generate", "validate_intent",
     "execute", "human_review", "wrap", "docstring", "cleanup",
     "finalize", "failed",
 }
@@ -154,6 +159,15 @@ async def run_cell(req: RunCellRequest):
         "exec_ok": False,
         "exec_error": "",
         "retry_count": 0,
+        "allow_cleanup":    req.allow_cleanup,
+        "force_review":     req.force_review,
+        "hr_strictness":    req.hr_strictness,
+        "allow_web_search": req.allow_web_search,
+        "max_retries":      req.max_retries if req.max_retries > 0 else 999,
+        "tool_hint":        "",
+        "license_review":   False,
+        "e2b_api_key":      E2B_API_KEY or "",
+        "code_level":       0,
         "status": "running",
         "hr_action": "",
         "stage": "start",
@@ -215,9 +229,9 @@ async def get_cell_state(cell_id: str):
 
 if __name__ == "__main__":
     if not E2B_API_KEY:
-        print("⚠️  E2B_API_KEY not set — node_execute will fail")
+        print("E2B_API_KEY not set — node_execute will fall back to static analysis")
     else:
-        print(f"✅ E2B_API_KEY loaded ({E2B_API_KEY[:8]}...)")
+        print(f"E2B_API_KEY loaded ({E2B_API_KEY[:8]}...)")
 
     import uvicorn
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)

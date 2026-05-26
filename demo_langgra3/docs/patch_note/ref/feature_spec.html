@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Builder — 기능 명세표</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0d0f12;
+    --surface: #13161b;
+    --surface2: #1a1e25;
+    --border: #252a33;
+    --border2: #2e3540;
+    --accent: #4af0a0;
+    --accent2: #2dd4bf;
+    --warn: #f0a04a;
+    --danger: #f05a4a;
+    --removed: #6b7280;
+    --text: #d1d8e4;
+    --text2: #7a8899;
+    --text3: #4a5568;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans KR', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  header span {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text3);
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .legend {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; color: var(--text2); }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    display: inline-block; flex-shrink: 0;
+  }
+  .dot-done   { background: var(--accent); }
+  .dot-partial { background: var(--warn); }
+  .dot-none   { background: var(--danger); }
+  .dot-removed { background: var(--removed); }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    height: calc(100vh - 65px);
+  }
+
+  /* ── Sidebar Nav ── */
+  nav {
+    width: 196px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    overflow-y: auto;
+  }
+  .nav-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0 16px 8px;
+  }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text2);
+    font-family: var(--sans);
+    font-size: 14px;
+    text-align: left;
+    transition: all 0.12s;
+    border-left: 2px solid transparent;
+  }
+  .nav-btn:hover { color: var(--text); background: var(--surface2); }
+  .nav-btn.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(74,240,160,0.05);
+  }
+  .nav-icon {
+    font-size: 15px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .nav-count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text3);
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ── Main Content ── */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 28px;
+  }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-title {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .section-subtitle {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead tr {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border2);
+  }
+  thead th {
+    padding: 9px 12px;
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    user-select: none;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+
+  td {
+    padding: 8px 12px;
+    vertical-align: middle;
+    color: var(--text);
+  }
+
+  /* editable cells */
+  td[contenteditable="true"] {
+    outline: none;
+    cursor: text;
+    transition: background 0.1s;
+    min-width: 60px;
+  }
+  td[contenteditable="true"]:focus {
+    background: rgba(74,240,160,0.06);
+    box-shadow: inset 0 0 0 1px rgba(74,240,160,0.3);
+  }
+
+  /* ── Status Badge ── */
+  .status-cell { white-space: nowrap; }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.1s;
+  }
+  .status-badge:hover { opacity: 0.8; }
+  .s-done    { background: rgba(74,240,160,0.12);  color: var(--accent); }
+  .s-partial { background: rgba(240,160,74,0.12);  color: var(--warn); }
+  .s-none    { background: rgba(240,90,74,0.12);   color: var(--danger); }
+  .s-removed { background: rgba(107,114,128,0.12); color: var(--removed); }
+
+  /* file chip */
+  .file-chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--text2);
+    margin: 1px 2px;
+  }
+
+  /* note cell */
+  .note-cell {
+    color: var(--text2);
+    font-size: 13px;
+    max-width: 260px;
+  }
+
+  /* ── Row Actions ── */
+  .row-actions {
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+  tr:hover .row-actions { opacity: 1; }
+
+  .btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 3px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+    line-height: 1;
+    transition: background 0.1s;
+    color: var(--text2);
+  }
+  .btn-icon:hover { background: var(--border2); color: var(--text); }
+  .btn-icon.del:hover { background: rgba(240,90,74,0.15); color: var(--danger); }
+
+  /* ── Add Row Button ── */
+  .add-row-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 10px;
+    background: none;
+    border: 1px dashed var(--border2);
+    border-radius: 4px;
+    padding: 7px 14px;
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+  }
+  .add-row-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(74,240,160,0.04);
+  }
+
+  /* ── Stats Bar ── */
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .stat-num {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-label { color: var(--text3); font-size: 12px; }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn-sm {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm.primary {
+    background: rgba(74,240,160,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--accent);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>▸ PIPELINE BUILDER</h1>
+  <span>기능 / 디자인 명세표</span>
+  <div class="header-right">
+    <div class="legend">
+      <span class="legend-item"><span class="dot dot-done"></span>구현완료</span>
+      <span class="legend-item"><span class="dot dot-partial"></span>부분구현</span>
+      <span class="legend-item"><span class="dot dot-none"></span>미구현</span>
+      <span class="legend-item"><span class="dot dot-removed"></span>제거됨</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav id="nav">
+    <div class="nav-label">영역</div>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const STATUSES = [
+  { key: 'done',    label: '✅ 구현완료',  cls: 's-done' },
+  { key: 'partial', label: '🔧 부분구현',  cls: 's-partial' },
+  { key: 'none',    label: '❌ 미구현',    cls: 's-none' },
+  { key: 'removed', label: '🗑 제거됨',    cls: 's-removed' },
+];
+
+const SECTIONS = [
+  {
+    id: 'canvas',
+    icon: '⬡',
+    title: '캔버스 & 노드 인터랙션',
+    files: ['canvas.js', 'edit.js', 'cell.css'],
+    rows: [
+      { item: '노드 생성 · 렌더링',          status: 'done',    files: ['canvas.js'],              note: '' },
+      { item: '노드 드래그 이동',             status: 'done',    files: ['canvas.js'],              note: '' },
+      { item: '엣지 그리기 (노드 간 연결)',   status: 'done',    files: ['canvas.js'],              note: '' },
+      { item: '툴 모드 전환',                 status: 'done',    files: ['canvas.js'],              note: '' },
+      { item: 'Lasso 선택',                   status: 'done',    files: ['canvas.js', 'cell.css'],  note: '' },
+      { item: '고스트 노드 (드래그 미리보기)',status: 'done',    files: ['canvas.js', 'cell.css'],  note: '' },
+      { item: '줌 / Pan',                     status: 'done',    files: ['edit.js'],                note: 'applyTransform()' },
+      { item: '줌 컨트롤 UI',                 status: 'done',    files: ['layout.css'],             note: '' },
+      { item: '컨텍스트 메뉴',               status: 'done',    files: ['edit.js', 'overlays.css'], note: '' },
+      { item: '단축키',                       status: 'done',    files: ['edit.js'],                note: '' },
+      { item: 'Schema-First 연결 검증',       status: 'partial', files: ['inspector.js'],           note: 'validatePipeline()에 포함, 타입·키 일치 여부 검사' },
+    ]
+  },
+  {
+    id: 'inspector',
+    icon: '◧',
+    title: 'Inspector 패널',
+    files: ['inspector.js', 'inspector.css', 'ui.js'],
+    rows: [
+      { item: '탭 전환 (Config / Result / 메모)', status: 'done', files: ['inspector.js', 'inspector.css'], note: '' },
+      { item: 'Apply (노드 설정 반영)',            status: 'done', files: ['inspector.js'],                  note: '' },
+      { item: 'validatePipeline()',               status: 'done', files: ['inspector.js'],                  note: '' },
+      { item: '결과(Result) 표시',                status: 'done', files: ['inspector.js', 'inspector.css'], note: '' },
+      { item: '메모 툴팁',                         status: 'done', files: ['ui.js', 'inspector.css'],        note: '' },
+      { item: 'Allow Web Search 체크박스',         status: 'done', files: ['inspector.js'],                  note: '활성화 시 search_tools 노드 실행' },
+      { item: 'Force Review 체크박스',             status: 'done', files: ['inspector.js'],                  note: '레벨 무관 HR 강제 트리거' },
+      { item: 'upstream_schema I/O Sync',          status: 'done', files: ['ui.js'],                         note: '' },
+    ]
+  },
+  {
+    id: 'runner',
+    icon: '▶',
+    title: '실행 엔진',
+    files: ['runner.js', 'hitl.js'],
+    rows: [
+      { item: 'topoSort()',             status: 'done', files: ['runner.js'],           note: 'DAG 위상 정렬' },
+      { item: 'runCell()',              status: 'done', files: ['runner.js'],           note: 'SSE 스트리밍 수신' },
+      { item: 'runFromNode()',          status: 'done', files: ['runner.js'],           note: '특정 노드부터 재실행' },
+      { item: 'setNodeStatus()',        status: 'done', files: ['runner.js'],           note: '노드 상태 시각 반영' },
+      { item: 'allow_web_search 전달',  status: 'done', files: ['runner.js'],           note: '' },
+      { item: 'max_retries 전달',       status: 'done', files: ['runner.js'],           note: '' },
+      { item: '실행 중단 (stop)',        status: 'done', files: ['runner.js'],           note: 'POST /cell/stop/{cell_id}' },
+      { item: 'Human Review 뱃지',      status: 'done', files: ['hitl.js', 'cell.css'], note: '' },
+      { item: 'HR 팝업',                status: 'done', files: ['hitl.js', 'overlays.css'], note: '' },
+      { item: 'resumeCell()',           status: 'done', files: ['hitl.js'],             note: 'POST /cell/resume' },
+    ]
+  },
+  {
+    id: 'settings',
+    icon: '⚙',
+    title: '설정 패널',
+    files: ['settings.js', 'settings.css'],
+    rows: [
+      { item: '테마 설정',              status: 'done', files: ['settings.js', 'settings.css'], note: '' },
+      { item: '폰트 설정',              status: 'done', files: ['settings.js', 'settings.css'], note: '' },
+      { item: '컬러 피커 (HSV)',         status: 'done', files: ['settings.js', 'settings.css'], note: '' },
+      { item: 'API Key 입력',            status: 'done', files: ['settings.js', 'settings.css'], note: '' },
+      { item: 'HR Strictness 슬라이더', status: 'done', files: ['settings.js'],                 note: 'getHRStrictness() → low/medium/high' },
+      { item: 'Max Retries 슬라이더',   status: 'done', files: ['settings.js'],                 note: '3/5/10/20/No limit, 직접 입력 병행' },
+    ]
+  },
+  {
+    id: 'project',
+    icon: '◫',
+    title: '프로젝트 관리 & 영속성',
+    files: ['store.js', 'project-ui.js'],
+    rows: [
+      { item: 'localStorage CRUD',  status: 'done', files: ['store.js'],      note: 'storeGet/Set/Delete' },
+      { item: '스냅샷 저장',         status: 'done', files: ['store.js'],      note: '' },
+      { item: 'relativeTime 표시',   status: 'done', files: ['store.js'],      note: '' },
+      { item: '사이드바 UI',          status: 'done', files: ['project-ui.js', 'layout.css'], note: '' },
+      { item: '로드 팝업',            status: 'done', files: ['project-ui.js', 'overlays.css'], note: '' },
+      { item: 'loadPipeline()',       status: 'done', files: ['project-ui.js'], note: '' },
+      { item: '앱 초기화',            status: 'done', files: ['project-ui.js'], note: '' },
+    ]
+  },
+  {
+    id: 'ui',
+    icon: '◈',
+    title: '공통 UI / 오버레이',
+    files: ['ui.js', 'overlays.css', 'layout.css'],
+    rows: [
+      { item: 'showModal()',                     status: 'done', files: ['ui.js', 'overlays.css'],   note: '' },
+      { item: 'showConfirm()',                   status: 'done', files: ['ui.js', 'overlays.css'],   note: '' },
+      { item: '토스트 알림',                      status: 'done', files: ['overlays.css'],            note: '' },
+      { item: '에러 로그 버튼 (#error-log-btn-wrap)', status: 'done', files: ['layout.css'],         note: '캔버스 좌하단 플로팅' },
+      { item: '에러 패널 팝업',                    status: 'done', files: ['layout.css'],             note: 'width 360px, 버튼 위 슬라이드업' },
+      { item: '툴 트레이',                         status: 'done', files: ['layout.css'],             note: '' },
+      { item: '헤더',                              status: 'done', files: ['layout.css'],             note: '' },
+    ]
+  },
+  {
+    id: 'backend',
+    icon: '⬡',
+    title: '백엔드 — LangGraph 파이프라인',
+    files: ['nodes.py', 'graph.py'],
+    rows: [
+      { item: 'inject_schema 노드',   status: 'done', files: ['nodes.py'], note: '' },
+      { item: 'search_tools 노드',    status: 'done', files: ['nodes.py'], note: 'allow_web_search=true 시 실행' },
+      { item: 'generate 노드',        status: 'done', files: ['nodes.py'], note: 'LLM 코드 생성, 재시도 루프 포함' },
+      { item: 'validate_intent 노드', status: 'done', files: ['nodes.py'], note: 'PASS/FAIL 조건부 엣지' },
+      { item: 'execute 노드',         status: 'done', files: ['nodes.py'], note: 'E2B 샌드박스 격리 실행' },
+      { item: 'classify_level 노드',  status: 'done', files: ['nodes.py'], note: 'HR 필요 여부 판단' },
+      { item: 'human_review 노드',    status: 'done', files: ['nodes.py'], note: 'approved/rewrite 분기' },
+      { item: 'wrap 노드',            status: 'done', files: ['nodes.py'], note: '' },
+      { item: 'docstring 노드',       status: 'done', files: ['nodes.py'], note: '' },
+      { item: 'cleanup 노드',         status: 'done', files: ['nodes.py'], note: 'allow_cleanup 플래그로 선택 실행' },
+      { item: 'finalize 노드',        status: 'done', files: ['nodes.py'], note: '' },
+      { item: 'failed 노드',          status: 'done', files: ['nodes.py'], note: 'max_retries 초과 시' },
+      { item: 'DAG 조립 & 컴파일',    status: 'done', files: ['graph.py'], note: '_compiled 인스턴스' },
+      { item: 'license_review 트리거', status: 'done', files: ['nodes.py'], note: 'non-permissive 라이선스 발견 시 HR' },
+    ]
+  },
+  {
+    id: 'api',
+    icon: '↯',
+    title: '백엔드 — API 엔드포인트',
+    files: ['api.py'],
+    rows: [
+      { item: 'POST /cell/run',              status: 'done', files: ['api.py'], note: 'SSE 스트림 반환' },
+      { item: 'POST /cell/stop/{cell_id}',   status: 'done', files: ['api.py'], note: '체크포인트 보존' },
+      { item: 'POST /cell/resume',           status: 'done', files: ['api.py'], note: 'HR 인터럽트 후 재개' },
+      { item: 'GET /cell/state/{cell_id}',   status: 'done', files: ['api.py'], note: '체크포인트 상태 조회' },
+    ]
+  },
+  {
+    id: 'removed',
+    icon: '✕',
+    title: '제거된 항목',
+    files: [],
+    rows: [
+      { item: '#statusbar',        status: 'removed', files: [], note: '하단 상태바 전체 삭제' },
+      { item: '#status-ws',        status: 'removed', files: [], note: 'WS 연결 상태 표시 (dead element)' },
+      { item: '#status-validity',  status: 'removed', files: [], note: '→ #error-log-btn-wrap으로 이동' },
+      { item: 'e2b_api_key (runner.js)', status: 'removed', files: [], note: '서버 env로 이관, runner에서 제거' },
+    ]
+  },
+  {
+    id: 'todo',
+    icon: '◎',
+    title: 'specs 목표 대비 미구현',
+    files: [],
+    rows: [
+      { item: '엣지 흐름 실시간 시각화 (Visual Tracing)', status: 'none',    files: [], note: '데이터가 엣지를 흐르는 애니메이션' },
+      { item: '각 단계 스냅샷 즉시 확인 (이미지·텍스트·JSON)', status: 'partial', files: [], note: 'Result 탭에 부분 구현, 실시간 스냅샷 미구현' },
+      { item: '하이브리드 인터페이스 (일반인 위젯 모드)',   status: 'none',    files: [], note: '단순화된 위젯 모드 미구현' },
+      { item: '분기 셀 (Branch Cell) — 마름모 형태',       status: 'none',    files: ['canvas.js', 'cell.css'], note: 'JSON Schema 필드 타입/값 기반 경로 분기. 트레이·우클릭으로 추가' },
+      { item: 'Broadcasting / Aggregating 전략',          status: 'none',    files: ['canvas.js', 'runner.js'], note: '분기 셀 기반 1:N 분사 및 조건부 집계 로직' },
+      { item: 'JSON Schema 기반 I/O assertion UI',         status: 'none',    files: ['inspector.js', 'inspector.css'], note: '필드명·타입·필수여부 테이블 편집기. 언어 무관 셀 간 계약' },
+      { item: 'Project Config 트레이 (Skill.md 전역 설정)', status: 'none',    files: ['canvas.js', 'inspector.js'], note: '툴 트레이와 구분선으로 분리된 별도 아이콘. 프로젝트 전체 셀에 skill 적용' },
+      { item: '파이프라인 단일 파일 Export',                status: 'none',    files: ['runner.js'], note: '연결 순서 기준으로 각 셀 코드를 묶어 단일 실행 파일로 다운로드' },
+    ]
+  },
+];
+
+// ── State ──
+let data = JSON.parse(localStorage.getItem('pipeline-spec') || 'null') || JSON.parse(JSON.stringify(SECTIONS));
+let activeSection = data[0].id;
+
+// ── Persist ──
+function save() {
+  localStorage.setItem('pipeline-spec', JSON.stringify(data));
+}
+
+// ── Toast ──
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// ── Status cycle ──
+function statusInfo(key) {
+  return STATUSES.find(s => s.key === key) || STATUSES[0];
+}
+function nextStatus(key) {
+  const idx = STATUSES.findIndex(s => s.key === key);
+  return STATUSES[(idx + 1) % STATUSES.length].key;
+}
+
+// ── Count stats ──
+function sectionStats(rows) {
+  const counts = { done: 0, partial: 0, none: 0, removed: 0 };
+  rows.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+  return counts;
+}
+
+// ── Render Nav ──
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = '<div class="nav-label">영역</div>';
+  data.forEach(sec => {
+    const btn = document.createElement('button');
+    btn.className = 'nav-btn' + (sec.id === activeSection ? ' active' : '');
+    btn.innerHTML = `<span class="nav-icon">${sec.icon}</span><span>${sec.title}</span><span class="nav-count">${sec.rows.length}</span>`;
+    btn.onclick = () => { activeSection = sec.id; renderAll(); };
+    nav.appendChild(btn);
+  });
+}
+
+// ── Render Table ──
+function renderSection(sec) {
+  const stats = sectionStats(sec.rows);
+  const total = sec.rows.length;
+
+  return `
+  <div class="section ${sec.id === activeSection ? 'active' : ''}" id="sec-${sec.id}">
+    <div class="section-header">
+      <div>
+        <div class="section-title">${sec.icon} ${sec.title}</div>
+        <div class="section-subtitle">총 ${total}개 항목</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn-sm" onclick="exportSection('${sec.id}')">내보내기</button>
+        <button class="btn-sm primary" onclick="addRow('${sec.id}')">+ 행 추가</button>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      ${stats.done    ? `<div class="stat-chip"><span class="dot dot-done"></span><div><div class="stat-num">${stats.done}</div><div class="stat-label">구현완료</div></div></div>` : ''}
+      ${stats.partial ? `<div class="stat-chip"><span class="dot dot-partial"></span><div><div class="stat-num">${stats.partial}</div><div class="stat-label">부분구현</div></div></div>` : ''}
+      ${stats.none    ? `<div class="stat-chip"><span class="dot dot-none"></span><div><div class="stat-num">${stats.none}</div><div class="stat-label">미구현</div></div></div>` : ''}
+      ${stats.removed ? `<div class="stat-chip"><span class="dot dot-removed"></span><div><div class="stat-num">${stats.removed}</div><div class="stat-label">제거됨</div></div></div>` : ''}
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:32%">항목</th>
+            <th style="width:13%">상태</th>
+            <th style="width:25%">담당 파일</th>
+            <th>비고</th>
+            <th style="width:56px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-${sec.id}">
+          ${sec.rows.map((row, i) => renderRow(sec.id, row, i)).join('')}
+        </tbody>
+      </table>
+    </div>
+    <button class="add-row-btn" onclick="addRow('${sec.id}')">＋ 새 항목 추가</button>
+  </div>`;
+}
+
+function renderRow(secId, row, idx) {
+  const si = statusInfo(row.status);
+  const filesHtml = (row.files || []).map(f => `<span class="file-chip">${f}</span>`).join('');
+  return `
+  <tr id="row-${secId}-${idx}">
+    <td contenteditable="true" onblur="updateCell('${secId}',${idx},'item',this.innerText.trim())">${escHtml(row.item)}</td>
+    <td class="status-cell">
+      <span class="status-badge ${si.cls}" onclick="cycleStatus('${secId}',${idx})" title="클릭하여 상태 변경">${si.label}</span>
+    </td>
+    <td contenteditable="true" onblur="updateFiles('${secId}',${idx},this.innerText.trim())" title="쉼표로 구분">${(row.files || []).join(', ')}</td>
+    <td class="note-cell" contenteditable="true" onblur="updateCell('${secId}',${idx},'note',this.innerText.trim())">${escHtml(row.note || '')}</td>
+    <td class="row-actions">
+      <button class="btn-icon del" onclick="deleteRow('${secId}',${idx})" title="삭제">✕</button>
+    </td>
+  </tr>`;
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Render All ──
+function renderAll() {
+  renderNav();
+  document.getElementById('main').innerHTML = data.map(renderSection).join('');
+}
+
+// ── Mutations ──
+function getSec(id) { return data.find(s => s.id === id); }
+
+function updateCell(secId, idx, field, val) {
+  getSec(secId).rows[idx][field] = val;
+  save();
+}
+
+function updateFiles(secId, idx, val) {
+  getSec(secId).rows[idx].files = val.split(',').map(s => s.trim()).filter(Boolean);
+  save();
+}
+
+function cycleStatus(secId, idx) {
+  const row = getSec(secId).rows[idx];
+  row.status = nextStatus(row.status);
+  save();
+  // re-render just the badge
+  const si = statusInfo(row.status);
+  const badge = document.querySelector(`#row-${secId}-${idx} .status-badge`);
+  if (badge) {
+    badge.className = `status-badge ${si.cls}`;
+    badge.textContent = si.label;
+  }
+  renderNav(); // update counts
+  toast(`상태 변경 → ${si.label}`);
+}
+
+function addRow(secId) {
+  const sec = getSec(secId);
+  sec.rows.push({ item: '새 항목', status: 'none', files: [], note: '' });
+  save();
+  renderAll();
+  // focus new row item cell
+  setTimeout(() => {
+    const tbody = document.getElementById(`tbody-${secId}`);
+    if (tbody) {
+      const lastRow = tbody.lastElementChild;
+      if (lastRow) {
+        const cell = lastRow.querySelector('td[contenteditable]');
+        if (cell) { cell.focus(); selectAll(cell); }
+      }
+    }
+  }, 50);
+  toast('항목 추가됨');
+}
+
+function selectAll(el) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function deleteRow(secId, idx) {
+  const sec = getSec(secId);
+  if (sec.rows.length <= 1) { toast('마지막 항목은 삭제할 수 없어요'); return; }
+  sec.rows.splice(idx, 1);
+  save();
+  renderAll();
+  toast('항목 삭제됨');
+}
+
+function exportSection(secId) {
+  const sec = getSec(secId);
+  const lines = [
+    `## ${sec.title}`,
+    '',
+    '| 항목 | 상태 | 담당 파일 | 비고 |',
+    '|---|---|---|---|',
+    ...sec.rows.map(r => {
+      const si = statusInfo(r.status);
+      return `| ${r.item} | ${si.label} | ${(r.files||[]).join(', ')} | ${r.note||''} |`;
+    }),
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `spec-${secId}.md`;
+  a.click();
+  toast('마크다운으로 내보냄');
+}
+
+// ── Init ──
+renderAll();
+</script>
+</body>
+</html>

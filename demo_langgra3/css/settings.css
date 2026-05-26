@@ -522,7 +522,6 @@ body.theme-light {
   padding: 0;
 }
 
-/* Re-wire: tabs live outside settings-body but inside modal */
 #settings-modal {
   /* already flex-col, header + (tabs+panels) row */
 }
@@ -623,3 +622,57 @@ body.theme-light {
   margin-top: 4px;
   display: block;
 }
+
+/* ── MAX RETRIES ──────────────────────────────── */
+.retry-labels-row {
+  position: relative; /* 자식 요소들의 absolute 위치 기준점이 됨 */
+  width: 100%;
+  height: 28px;       /* 두 줄 라벨(No Limit) 높이를 고려한 고정 높이 */
+  margin-top: 6px;
+}
+
+.retry-label {
+  position: absolute; /* 절대 좌표로 위치 지정 */
+  top: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.2;
+  
+  /* 글자 자체의 중심축을 기준으로 정렬하기 위한 핵심 속성 */
+  transform: translateX(-50%); 
+}
+
+/* 각 눈금의 정확한 퍼센트 위치 계산 (좌표 강제 지정) */
+.retry-label:nth-child(1) { left: 0%;   transform: translateX(0); }     /* '3' -> 왼쪽 끝 정렬 */
+.retry-label:nth-child(2) { left: 25%; }                                 /* '5' -> 정확히 25% 중앙 */
+.retry-label:nth-child(3) { left: 50%; }                                 /* '10' -> 정확히 50% 중앙 */
+.retry-label:nth-child(4) { left: 75%; }                                 /* '20' -> 정확히 75% 중앙 */
+.retry-label:nth-child(5) { left: 100%; transform: translateX(-100%); } /* 'No Limit' -> 오른쪽 끝 정렬 */
+
+
+/* 이하 직접 입력 row 스타일 (기존과 동일) */
+.retry-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px; /* 라벨 영역 높이가 생겼으므로 간격 살짝 조정 */
+}
+
+.retry-number-input {
+  width: 64px;
+  flex-shrink: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.12s;
+}
+
+.retry-number-input:focus { border-color: var(--accent); }
+.retry-number-input::placeholder { color: var(--text3); }

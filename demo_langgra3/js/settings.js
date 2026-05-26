@@ -64,7 +64,6 @@ function ccpOpen(anchorBtn, currentHex, onApply) {
   ccpUpdateUI();
   ccpPopup.classList.remove('hidden');
 
-  // Position: right of anchor button, vertically centered
   const rect = anchorBtn.getBoundingClientRect();
   const pw = 216, ph = 200;
   let left = rect.right + 8;
@@ -78,7 +77,6 @@ function ccpOpen(anchorBtn, currentHex, onApply) {
 
 function ccpClose() { ccpPopup.classList.add('hidden'); }
 
-// SV canvas drag
 ccpCanvas.addEventListener('mousedown', e => { ccpDragging = 'sv'; ccpSVMove(e); });
 document.addEventListener('mousemove', e => {
   if (ccpDragging === 'sv') ccpSVMove(e);
@@ -94,7 +92,6 @@ function ccpSVMove(e) {
   if (ccp.onApply) ccp.onApply(hsvToHex(ccp.hue, ccp.s, ccp.v), false);
 }
 
-// Hue strip drag
 ccpHueStrip.addEventListener('mousedown', e => { ccpDragging = 'hue'; ccpHueMove(e); });
 
 function ccpHueMove(e) {
@@ -104,7 +101,6 @@ function ccpHueMove(e) {
   if (ccp.onApply) ccp.onApply(hsvToHex(ccp.hue, ccp.s, ccp.v), false);
 }
 
-// Hex input
 ccpHexInput.addEventListener('input', e => {
   const v = e.target.value;
   if (/^#[0-9a-f]{6}$/i.test(v)) {
@@ -114,14 +110,12 @@ ccpHexInput.addEventListener('input', e => {
   }
 });
 
-// Apply button
 document.getElementById('ccp-apply').addEventListener('click', () => {
   const hex = hsvToHex(ccp.hue, ccp.s, ccp.v);
   if (ccp.onApply) ccp.onApply(hex, true);
   ccpClose();
 });
 
-// Close on outside click
 document.addEventListener('mousedown', e => {
   if (!ccpPopup.classList.contains('hidden') && !ccpPopup.contains(e.target) && !e.target.classList.contains('rainbow-picker-btn') && !e.target.classList.contains('rainbow-swatch'))
     ccpClose();
@@ -141,7 +135,6 @@ document.querySelectorAll('.settings-tab').forEach(tab => {
   });
 });
 
-// API key show/hide toggle
 document.querySelectorAll('.apikey-toggle').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = document.getElementById(btn.dataset.target);
@@ -150,7 +143,6 @@ document.querySelectorAll('.apikey-toggle').forEach(btn => {
   });
 });
 
-// Expose getApiKeys() for backend integration
 window.getHRStrictness = () => {
   const val = parseInt(document.getElementById('hr-strictness-slider')?.value ?? '0', 10);
   return ['low', 'medium', 'high'][val] || 'low';
@@ -170,6 +162,60 @@ document.getElementById('hr-strictness-slider')?.addEventListener('input', e => 
   if (descEl)  descEl.textContent  = _hrDescs[val]  || '';
 });
 
+/* ── MAX RETRIES ──────────────────────────────── */
+// 5단계 quantized: 인덱스 0~4 → 실제값 [3, 5, 10, 20, 0(=no-limit)]
+const _RETRY_STEPS  = [3, 5, 10, 20, 0];
+
+window.getMaxRetries = () => {
+  const idx = parseInt(document.getElementById('max-retries-slider')?.value ?? '0', 10);
+  return _RETRY_STEPS[idx] ?? 3;
+};
+
+function _retrySnapToStep(inputVal) {
+  const n = parseInt(inputVal, 10);
+  if (isNaN(n)) return _RETRY_STEPS.length - 1;
+  let best = 0, bestDist = Infinity;
+  _RETRY_STEPS.forEach((v, i) => {
+    if (v === 0) return;
+    const d = Math.abs(v - n);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+
+function _syncRetrySliderToInput(idx) {
+  const isNoLimit = _RETRY_STEPS[idx] === 0;
+  const inputEl = document.getElementById('max-retries-input');
+  if (inputEl) {
+    inputEl.value       = isNoLimit ? '' : _RETRY_STEPS[idx];
+    inputEl.placeholder = isNoLimit ? 'No limit' : '';
+  }
+}
+
+function _syncRetryInputToSlider(raw) {
+  const sliderEl = document.getElementById('max-retries-slider');
+  if (!sliderEl) return;
+  if (!raw || raw.trim() === '') {
+    sliderEl.value = _RETRY_STEPS.length - 1;
+    _syncRetrySliderToInput(_RETRY_STEPS.length - 1);
+    return;
+  }
+  const idx = _retrySnapToStep(raw);
+  sliderEl.value = idx;
+  _syncRetrySliderToInput(idx);
+}
+
+document.getElementById('max-retries-slider')?.addEventListener('input', e => {
+  _syncRetrySliderToInput(parseInt(e.target.value, 10));
+});
+
+document.getElementById('max-retries-input')?.addEventListener('blur', e => {
+  _syncRetryInputToSlider(e.target.value.trim());
+  const idx = parseInt(document.getElementById('max-retries-slider')?.value ?? '0', 10);
+  e.target.value       = _RETRY_STEPS[idx] === 0 ? '' : _RETRY_STEPS[idx];
+  e.target.placeholder = _RETRY_STEPS[idx] === 0 ? 'No limit' : '';
+});
+
 window.getApiKeys = () => ({
   anthropic: document.getElementById('apikey-anthropic')?.value || '',
   google:    document.getElementById('apikey-google')?.value    || '',
@@ -177,6 +223,7 @@ window.getApiKeys = () => ({
   e2b:       document.getElementById('apikey-e2b')?.value       || '',
   backend:   document.getElementById('apikey-backend')?.value   || 'http://localhost:8000',
 });
+
 /* ── SETTINGS ─────────────────────────────────── */
 const settingsState = {
   theme:       'dark',
@@ -185,14 +232,13 @@ const settingsState = {
   cellRadius:  10,
   inputColor:  '#1e3a5f',
   outputColor: '#5f1e1e',
-  fontFamily:   'sans',     // 'sans' | 'mono' | 'serif'
-  fontSizeName:  13,        // px for .cell-node-name
-  fontSizeIO:    10,        // px for .cell-io-type chips
-  fontColorName: 'default', // 'default' or hex
-  fontColorIO:   'default', // 'default' or hex
+  fontFamily:   'sans',
+  fontSizeName:  13,
+  fontSizeIO:    10,
+  fontColorName: 'default',
+  fontColorIO:   'default',
 };
 
-// Luminance-based text color for cell name
 function contrastColor(hex) {
   const h = hex.replace('#','');
   const r = parseInt(h.substr(0,2),16);
@@ -202,9 +248,7 @@ function contrastColor(hex) {
   return lum > 0.5 ? '#111111' : '#f0f0f0';
 }
 
-
 function buildPlusSVG() {
-  // Use theme state directly — avoids CSS variable read timing issues
   const color = settingsState.theme === 'light'
     ? 'rgba(0,0,0,0.15)'
     : 'rgba(255,255,255,0.13)';
@@ -221,15 +265,10 @@ function applyPattern(pattern) {
   const wrap = document.getElementById('canvas-wrap');
   const c = 'var(--pattern-color)';
   const patterns = {
-    // 1. X 무늬 — 얇게
     cross:    `linear-gradient(45deg, transparent 47%, ${c} 47%, ${c} 53%, transparent 53%), linear-gradient(-45deg, transparent 47%, ${c} 47%, ${c} 53%, transparent 53%)`,
-    // 2. 점 무늬 — 큰 점
     dots:     `radial-gradient(circle at 3px 3px, ${c} 4px, transparent 0)`,
-    // 3. 촘촘한 격자 무늬
     grid:     `linear-gradient(${c} 1px, transparent 1px), linear-gradient(90deg, ${c} 1px, transparent 1px)`,
-    // 4. + 무늬 — SVG 타일로 + 기호를 점처럼 찍기 (패턴2와 동일 방식)
     diagonal: buildPlusSVG(),
-    // 5. / 무늬 — 단방향 사선
     none:     `linear-gradient(45deg, transparent 47%, ${c} 47%, ${c} 53%, transparent 53%)`,
   };
   const sizes = { cross:'64px 64px', dots:'56px 56px', grid:'40px 40px', diagonal:'56px 56px', none:'64px 64px' };
@@ -241,7 +280,6 @@ function applyCellColor(color) {
   const bg = color === 'default' ? null : color;
   const textColor = bg ? contrastColor(bg) : null;
   document.querySelectorAll('.cell-node').forEach(el => {
-    // Skip IO nodes — they have independent colors
     const nodeId = parseInt(el.id.replace('node-', ''));
     const n = state.nodes.find(x => x.id === nodeId);
     if (n && (n.type === 'input' || n.type === 'output')) return;
@@ -286,11 +324,9 @@ function applyCellRadius(r) {
 function applyTheme(theme) {
   settingsState.theme = theme;
   document.body.classList.toggle('theme-light', theme === 'light');
-  // Re-apply pattern so SVG tile picks up new --pattern-color
   requestAnimationFrame(() => applyPattern(settingsState.pattern));
 }
 
-// Patch renderNode to apply current settings on creation
 const _origRenderNode = renderNode;
 
 document.getElementById('btn-settings').addEventListener('click', () => {
@@ -306,7 +342,6 @@ document.getElementById('settings-overlay').addEventListener('click', e => {
     document.getElementById('settings-overlay').classList.add('hidden');
 });
 
-// Theme
 document.querySelectorAll('.theme-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
@@ -315,7 +350,6 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
   });
 });
 
-// Pattern
 document.querySelectorAll('.pattern-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.pattern-btn').forEach(b => b.classList.remove('active'));
@@ -325,7 +359,6 @@ document.querySelectorAll('.pattern-btn').forEach(btn => {
   });
 });
 
-// Cell color swatches
 document.querySelectorAll('.cell-color-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.classList.contains('rainbow-picker-btn')) {
@@ -342,8 +375,6 @@ document.querySelectorAll('.cell-color-btn').forEach(btn => {
     applyCellColor(btn.dataset.color);
   });
 });
-
-
 
 /* ── FONT SETTINGS ─────────────────────────────── */
 const FONT_MAP = {
@@ -365,7 +396,6 @@ function applyFontColor(target, color) {
   if (target === 'name') {
     settingsState.fontColorName = color;
     document.querySelectorAll('.cell-node-name').forEach(el => {
-      // Only override if cell bg isn't overriding (IO cells manage their own contrast)
       const nodeId = parseInt(el.closest('.cell-node')?.id.replace('node-', '') || '0');
       const n = state.nodes.find(x => x.id === nodeId);
       const isIO = n && (n.type === 'input' || n.type === 'output');
@@ -395,7 +425,6 @@ function applyFontSize(target, size) {
   }
 }
 
-// Font family
 document.querySelectorAll('.font-family-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.font-family-btn').forEach(b => b.classList.remove('active'));
@@ -404,7 +433,6 @@ document.querySelectorAll('.font-family-btn').forEach(btn => {
   });
 });
 
-// Font size buttons
 document.querySelectorAll('.font-size-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.target;
@@ -417,7 +445,6 @@ document.querySelectorAll('.font-size-btn').forEach(btn => {
   });
 });
 
-// Font color buttons
 document.querySelectorAll('.font-color-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.target;
@@ -439,7 +466,6 @@ document.getElementById('font-color-io-custom').addEventListener('input', e => {
   applyFontColor('io', e.target.value);
 });
 
-// IO cell colors
 document.querySelectorAll('.io-color-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.target;
@@ -458,9 +484,6 @@ document.querySelectorAll('.io-color-btn').forEach(btn => {
   });
 });
 
-
-
-// Cell shape
 document.querySelectorAll('.cell-shape-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.cell-shape-btn').forEach(b => b.classList.remove('active'));
@@ -469,7 +492,6 @@ document.querySelectorAll('.cell-shape-btn').forEach(btn => {
   });
 });
 
-// Apply settings to newly created nodes (monkey-patch after renderNode is defined)
 const _applySettingsToNode = (nodeEl) => {
   const nodeId = parseInt(nodeEl.id.replace('node-', ''));
   const n = state.nodes.find(x => x.id === nodeId);
@@ -479,11 +501,8 @@ const _applySettingsToNode = (nodeEl) => {
     const contrast = contrastColor(ioColor);
     const nameEl = nodeEl.querySelector('.cell-node-name');
     if (nameEl) nameEl.style.color = contrast;
-    // IO label text (IN / OUT) also follows contrast
     nodeEl.querySelectorAll('.io-label-text').forEach(el => { el.style.color = contrast; });
-    // IO type chips follow contrast too
     nodeEl.querySelectorAll('.cell-io-type').forEach(el => { el.style.color = contrast; el.style.background = 'rgba(128,128,128,0.15)'; });
-    // cell-node-type label
     const typeLabel = nodeEl.querySelector('.cell-node-type');
     if (typeLabel) typeLabel.style.color = contrast === '#111111' ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)';
   } else {
@@ -494,7 +513,6 @@ const _applySettingsToNode = (nodeEl) => {
     }
   }
   nodeEl.style.borderRadius = settingsState.cellRadius + 'px';
-  // Apply font
   const nameEl2 = nodeEl.querySelector('.cell-node-name');
   if (nameEl2) {
     nameEl2.style.fontFamily = FONT_MAP[settingsState.fontFamily] || FONT_MAP.sans;
@@ -510,7 +528,6 @@ const _applySettingsToNode = (nodeEl) => {
   });
 };
 
-// Hook into canvas MutationObserver to catch new nodes
 new MutationObserver(mutations => {
   mutations.forEach(m => {
     m.addedNodes.forEach(node => {
