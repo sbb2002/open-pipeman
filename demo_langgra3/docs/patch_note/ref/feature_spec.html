@@ -574,7 +574,7 @@ const SECTIONS = [
       { item: '셀 템플릿 선택',                             status: 'none',    files: ['canvas.js', 'ui.js'],         note: '셀 추가 시 미리 채워진 프롬프트 선택 옵션. ex) 이미지 처리·텍스트 요약 등' },
       { item: '도움말 창',                                  status: 'none',    files: ['ui.js', 'overlays.css'],      note: '사용 방법·기능 목록 안내. 헤더 또는 단축키로 접근 가능' },
       { item: '분기 셀 (Branch Cell) — 마름모 형태',       status: 'none',    files: ['canvas.js', 'cell.css'], note: 'JSON Schema 필드 타입/값 기반 경로 분기. 트레이·우클릭으로 추가' },
-      { item: 'Broadcasting / Aggregating 전략',          status: 'none',    files: ['canvas.js', 'runner.js'], note: '분기 셀 기반 1:N 분사 및 조건부 집계 로직' },
+      { item: 'Broadcasting / Aggregating 전략',          status: 'none',    files: ['canvas.js', 'runner.js'], note: '캔버스 연결 구조(1:N, N:1)를 분석해 LLM 코드 생성 시 병렬 패턴(asyncio·Promise.all 등) 자동 적용. 코드 생성 순서는 순차 유지' },
       { item: 'JSON Schema 기반 I/O assertion UI',         status: 'none',    files: ['inspector.js', 'inspector.css'], note: '필드명·타입·필수여부 테이블 편집기. 언어 무관 셀 간 계약' },
       { item: 'Project Config 트레이 (Skill.md 전역 설정)', status: 'none',    files: ['canvas.js', 'inspector.js'], note: '툴 트레이와 구분선으로 분리된 별도 아이콘. 프로젝트 전체 셀에 skill 적용' },
       { item: '파이프라인 단일 파일 Export',                status: 'none',    files: ['runner.js'], note: '연결 순서 기준으로 각 셀 코드를 묶어 단일 실행 파일로 다운로드' },
