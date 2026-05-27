@@ -58,8 +58,6 @@ document.addEventListener('keydown', e => {
 
 /* Hit-test: is click point near a bezier curve edge? */
 function getEdgeAtPoint(hitX, hitY) {
-  // hitX/Y는 pan 보정된 canvas-wrap 기준 좌표 (zoom 미적용)
-  // drawEdges()와 동일하게 논리 좌표 * zoom + pan으로 비교
   const THRESH = 10;
   const z = state.zoom;
 
@@ -83,7 +81,6 @@ function getEdgeAtPoint(hitX, hitY) {
     const x2 = (toNode.x  + tw / 2) * z + px;
     const y2 = (toNode.y) * z + py;
 
-    // Sample bezier at N points and check distance
     const cp1x = x1, cp1y = y1 + (y2 - y1) * 0.5;
     const cp2x = x2, cp2y = y1 + (y2 - y1) * 0.5;
 
@@ -155,7 +152,8 @@ document.getElementById('canvas-wrap').addEventListener('contextmenu', e => {
         }
       }] : []),
       'sep',
-    ];    if (!isIONode) {
+    ];
+    if (!isIONode) {
       nodeMenuItems.push({
         icon: '↔', label: 'X축 정렬 — 후행 셀을 현재 X로',
         action: () => alignDescendantsX(nodeId)
@@ -180,7 +178,7 @@ document.getElementById('canvas-wrap').addEventListener('contextmenu', e => {
       action: () => {
         pushHistory();
         const n = state.nodes.find(n => n.id === nodeId);
-        if (n) { clearNodeConfig(n); state.edges.forEach(e => { if (e.from === nodeId || e.to === nodeId) e.valid = false; }); drawEdges(); validatePipeline(); }
+        if (n) { clearNodeConfig(n); drawEdges(); validatePipeline(); }
       }
     });
     nodeMenuItems.push('sep');
@@ -217,7 +215,6 @@ document.getElementById('canvas-wrap').addEventListener('contextmenu', e => {
   }
 
   // 3. Canvas background
-  // zoom 보정: pan 보정된 canvas-wrap 기준 좌표 → canvas 내부 논리 좌표
   const lcx = cx / state.zoom;
   const lcy = cy / state.zoom;
   ctxTarget = { kind: 'canvas', x: lcx, y: lcy };
@@ -276,23 +273,19 @@ document.getElementById('canvas-wrap').addEventListener('contextmenu', e => {
     },
   ]);
 });
+
 /* ── CLEAR CONFIG HELPERS ─────────────────────── */
 function clearNodeConfig(node) {
-  node.model      = '';
-  node.inputType  = '';
-  node.outputType = '';
-  node.inputDesc  = '';
-  node.outputDesc = '';
-  node.prompt     = '';
-  node.webSearch  = false;
-  node.domains    = '';
-  node.memo       = '';
-  // Update display chips
-  const ni = document.getElementById(`ni-${node.id}`);
-  const no = document.getElementById(`no-${node.id}`);
-  if (ni) ni.textContent = '—';
-  if (no) no.textContent = '—';
-  // Refresh inspector if this node is open
+  node.model          = '';
+  node.inputContract  = null;
+  node.outputContract = null;
+  node.prompt         = '';
+  node.webSearch      = false;
+  node.domains        = '';
+  node.memo           = '';
+  // 노드 카드 I/O 표시 초기화
+  if (typeof updateNodeIODisplay === 'function') updateNodeIODisplay(node.id);
+  // Inspector가 이 노드를 열고 있으면 갱신
   if (state.selectedNode === node.id) openInspector(node.id);
 }
 
@@ -305,7 +298,7 @@ function clearAllConfigs() {
 
 function clearAllConfigsNoHistory() {
   state.nodes.forEach(n => clearNodeConfig(n));
-  state.edges.forEach(e => { e.valid = false; });
+  // 엣지는 항상 valid — valid 필드 리셋 불필요
 }
 
 function clearAllEdges() {
@@ -336,6 +329,7 @@ function deleteNode(id, skipHistory = false) {
   drawEdges();
   validatePipeline();
 }
+
 /* ── ALIGN FUNCTIONS ─────────────────────────── */
 
 /* Util: set node position and update DOM */
@@ -357,27 +351,24 @@ function getDescendants(nodeId) {
   return [...visited];
 }
 
-/* Canvas X align: I/O cells share same X, rest laid out symmetrically *//* ── AUTO LAYOUT (Sugiyama-style DAG layout) ────── */
+/* ── AUTO LAYOUT (Sugiyama-style DAG layout) ────── */
 function autoLayout() {
   if (state.nodes.length === 0) return;
   pushHistory();
 
   const NODE_W = 180;
-  const NODE_H = 110;   // approximate rendered height
-  const PAD_X  = 60;    // horizontal gap between nodes
-  const PAD_Y  = 80;    // vertical gap between layers
+  const NODE_H = 110;
+  const PAD_X  = 60;
+  const PAD_Y  = 80;
 
-  // ── Step 1: Assign layers (longest-path ranking) ──────────────────────────
-  // Build adjacency
-  const successors   = {};  // id → [id]
-  const predecessors = {};  // id → [id]
+  const successors   = {};
+  const predecessors = {};
   state.nodes.forEach(n => { successors[n.id] = []; predecessors[n.id] = []; });
   state.edges.forEach(e => {
     successors[e.from]?.push(e.to);
     predecessors[e.to]?.push(e.from);
   });
 
-  // Topological sort (Kahn's algorithm)
   const inDeg = {};
   state.nodes.forEach(n => inDeg[n.id] = predecessors[n.id].length);
   const queue = state.nodes.filter(n => inDeg[n.id] === 0).map(n => n.id);
@@ -390,17 +381,14 @@ function autoLayout() {
       if (inDeg[nxt] === 0) queue.push(nxt);
     });
   }
-  // Any nodes not reached (cycles / isolated) append at end
   state.nodes.forEach(n => { if (!topoOrder.includes(n.id)) topoOrder.push(n.id); });
 
-  // Layer = max layer of predecessors + 1
   const layer = {};
   topoOrder.forEach(id => {
     const preds = predecessors[id] || [];
     layer[id] = preds.length === 0 ? 0 : Math.max(...preds.map(p => layer[p] ?? 0)) + 1;
   });
 
-  // Group nodes by layer
   const layerGroups = {};
   state.nodes.forEach(n => {
     const l = layer[n.id] ?? 0;
@@ -409,12 +397,9 @@ function autoLayout() {
   });
   const layerKeys = Object.keys(layerGroups).map(Number).sort((a, b) => a - b);
 
-  // ── Step 2: Assign provisional X positions per layer for barycenter ────────
-  // Use floating-point "order index" that updates each sweep
-  const orderX = {};  // id → float order value (used for barycenter)
+  const orderX = {};
   state.nodes.forEach(n => { orderX[n.id] = 0; });
 
-  // Initialize order by current user X position
   layerKeys.forEach(lk => {
     const grp = [...layerGroups[lk]].sort((a, b) => {
       const na = state.nodes.find(n => n.id === a);
@@ -425,38 +410,30 @@ function autoLayout() {
     layerGroups[lk] = grp;
   });
 
-  // Barycenter using orderX (real position proxy) — alternating sweep
   function bary(id, useSuccessors) {
     const nbrs = useSuccessors ? (successors[id] || []) : (predecessors[id] || []);
-    if (nbrs.length === 0) return orderX[id]; // keep current if no neighbors
+    if (nbrs.length === 0) return orderX[id];
     return nbrs.reduce((s, nid) => s + (orderX[nid] ?? 0), 0) / nbrs.length;
   }
 
-  // Multiple alternating sweeps (down then up) for convergence
   for (let pass = 0; pass < 8; pass++) {
     const forward = pass % 2 === 0;
     const keys = forward ? layerKeys : [...layerKeys].reverse();
-    keys.forEach((lk, li) => {
+    keys.forEach((lk) => {
       const isTop = lk === layerKeys[0];
       const grp = layerGroups[lk];
-      // Compute new order values
       const withBary = grp.map(id => ({ id, b: bary(id, isTop && forward) }));
       withBary.sort((a, b) => a.b - b.b);
-      // Assign integer positions
       withBary.forEach(({ id }, i) => { orderX[id] = i; });
       layerGroups[lk] = withBary.map(x => x.id);
     });
   }
 
-  // ── Step 3: Assign pixel coordinates ─────────────────────────────────────
   const wrap    = document.getElementById('canvas-wrap');
   const canvasW = wrap.clientWidth;
   const canvasH = wrap.clientHeight;
-
-  const numLayers   = layerKeys.length;
-  const maxPerLayer = Math.max(...layerKeys.map(lk => layerGroups[lk].length));
-  const totalH = numLayers   * NODE_H + (numLayers   - 1) * PAD_Y;
-
+  const numLayers = layerKeys.length;
+  const totalH = numLayers * NODE_H + (numLayers - 1) * PAD_Y;
   const startY = Math.max(40, Math.round((canvasH - totalH) / 2));
 
   const positions = {};
@@ -464,7 +441,6 @@ function autoLayout() {
     const grp   = layerGroups[lk];
     const count = grp.length;
     const rowW  = count * NODE_W + (count - 1) * PAD_X;
-    // Each row is independently centred in the canvas
     const rowStartX = Math.round((canvasW - rowW) / 2);
     const y = startY + li * (NODE_H + PAD_Y);
     grp.forEach((id, xi) => {
@@ -472,7 +448,6 @@ function autoLayout() {
     });
   });
 
-  // ── Step 4: Apply positions ───────────────────────────────────────────────
   state.nodes.forEach(n => {
     const pos = positions[n.id];
     if (!pos) return;
@@ -487,24 +462,21 @@ function alignAllX() {
   if (state.nodes.length < 2) return;
 
   const NODE_W  = 180;
-  const NODE_CX = NODE_W / 2; // center offset within a node
+  const NODE_CX = NODE_W / 2;
 
   const ioNodes   = state.nodes.filter(n => n.type === 'input' || n.type === 'output');
   const restNodes = state.nodes.filter(n => n.type !== 'input' && n.type !== 'output');
 
-  // Axis = center-x of I/O nodes (connection endpoint), or canvas center
   const canvasW = document.getElementById('canvas-wrap').clientWidth;
-  let axisCX; // this is the CENTER-x that edges connect to
+  let axisCX;
   if (ioNodes.length > 0) {
     axisCX = Math.round(ioNodes.reduce((s, n) => s + n.x + NODE_CX, 0) / ioNodes.length);
   } else {
     axisCX = Math.round(canvasW / 2);
   }
 
-  // Snap I/O nodes so their center aligns to axisCX
   ioNodes.forEach(n => setNodePos(n, axisCX - NODE_CX, null));
 
-  // Group rest nodes by Y-row (same row = same edge endpoints at same depth)
   const SNAP = 80;
   const sortedByY = [...restNodes].sort((a, b) => a.y - b.y);
   const rows = [];
@@ -519,22 +491,15 @@ function alignAllX() {
   }
   if (row.length) rows.push(row);
 
-  // For each row: spread nodes so their centers are symmetric around axisCX
-  // Single node in row → center on axis
-  // Multiple nodes → evenly spaced, centers symmetric around axisCX
-  const GAP = NODE_W + 24; // gap between node centers
+  const GAP = NODE_W + 24;
 
   rows.forEach(rowNodes => {
     const count = rowNodes.length;
-    // Sort left-to-right by current x to preserve user's intended ordering
     const sorted = [...rowNodes].sort((a, b) => a.x - b.x);
 
     if (count === 1) {
-      // Sole node: its center (= edge endpoint) lands on axisCX
       setNodePos(sorted[0], axisCX - NODE_CX, null);
     } else {
-      // Distribute centers: [-floor(n/2)…, -1, 0(if odd), 1, …, floor(n/2)]
-      // But we want symmetric: step = GAP, centered on axisCX
       const totalSpan = (count - 1) * GAP;
       const startCX   = axisCX - totalSpan / 2;
       sorted.forEach((node, i) => {
@@ -548,7 +513,6 @@ function alignAllX() {
   validatePipeline();
 }
 
-/* Canvas Y align: snap same-row clusters (existing behaviour) */
 function alignAllY() {
   if (state.nodes.length < 2) return;
   const SNAP   = 80;
@@ -572,7 +536,6 @@ function alignAllY() {
   validatePipeline();
 }
 
-/* Node X align: all downstream successors snap to this node's X */
 function alignDescendantsX(nodeId) {
   const srcNode = state.nodes.find(n => n.id === nodeId);
   if (!srcNode) return;
@@ -587,7 +550,6 @@ function alignDescendantsX(nodeId) {
   validatePipeline();
 }
 
-/* Node Y align: snap nodes in the same Y cluster as this node */
 function alignSameRowY(nodeId) {
   const srcNode = state.nodes.find(n => n.id === nodeId);
   if (!srcNode) return;
@@ -607,7 +569,6 @@ function applyTransform() {
   const py = state.panY || 0;
   canvasEl.style.transformOrigin = '0 0';
   canvasEl.style.transform = `translate(${px}px, ${py}px) scale(${state.zoom})`;
-  // 배경 패턴을 pan offset에 맞춰 이동 (64px 타일 기준 나머지 연산으로 seamless)
   wrap.style.backgroundPosition = `${px % 64}px ${py % 64}px`;
   drawEdges();
 }
@@ -632,6 +593,7 @@ document.getElementById('zoom-pct').addEventListener('change', e => {
   const v = parseInt(e.target.value);
   if (!isNaN(v)) applyZoom(v / 100);
 });
+
 /* ── UNDO HISTORY ─────────────────────────────── */
 function pushHistory() {
   state.history.push({
@@ -640,14 +602,12 @@ function pushHistory() {
     nextId: state.nextId,
   });
   if (state.history.length > 50) state.history.shift();
-  // New action invalidates redo chain
   state.redoStack = [];
 }
 
 function popHistory() {
   if (state.history.length === 0) return;
 
-  // Save current state to redo stack before restoring
   state.redoStack.push({
     nodes:  JSON.parse(JSON.stringify(state.nodes)),
     edges:  JSON.parse(JSON.stringify(state.edges)),
@@ -662,7 +622,6 @@ function popHistory() {
 function pushRedo() {
   if (state.redoStack.length === 0) return;
 
-  // Save current state to undo stack
   state.history.push({
     nodes:  JSON.parse(JSON.stringify(state.nodes)),
     edges:  JSON.parse(JSON.stringify(state.edges)),
@@ -675,7 +634,6 @@ function pushRedo() {
 }
 
 function restoreSnapshot(snap) {
-  // Clear canvas DOM
   canvas.innerHTML = '';
   canvas.appendChild(ghostLayer);
   ctx.clearRect(0, 0, edgeCanvas.width, edgeCanvas.height);
@@ -688,7 +646,6 @@ function restoreSnapshot(snap) {
   state.selectedEdge  = null;
 
   state.nodes.forEach(n => renderNode(n));
-  // Ensure IO cells always present
   if (!state.nodes.find(n => n.type === 'input') || !state.nodes.find(n => n.type === 'output')) {
     requestAnimationFrame(initIOCells);
   } else {
@@ -698,12 +655,12 @@ function restoreSnapshot(snap) {
   drawEdges();
   validatePipeline();
 }
+
 /* ── KEYBOARD SHORTCUTS ───────────────────────── */
 document.addEventListener('keydown', e => {
   const tag = document.activeElement.tagName;
   const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
-  // Ctrl+Enter — Apply cell config
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     const applyBtn = document.getElementById('apply-btn');
     if (!inspector.classList.contains('closed') && applyBtn) {
@@ -713,21 +670,18 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Ctrl+Z — Undo
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !inInput) {
     e.preventDefault();
     popHistory();
     return;
   }
 
-  // Ctrl+Y — Redo
   if ((e.ctrlKey || e.metaKey) && e.key === 'y' && !inInput) {
     e.preventDefault();
     pushRedo();
     return;
   }
 
-  // Delete — delete selected node(s) or selected edge
   if (e.key === 'Delete' && !inInput) {
     if (state.selectedEdge) {
       pushHistory();
@@ -751,7 +705,6 @@ document.addEventListener('keydown', e => {
     }
   }
 
-  // Ctrl+A — select all nodes
   if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !inInput) {
     e.preventDefault();
     closeInspector();
@@ -765,7 +718,6 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Ctrl+C — copy selected node(s)
   if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !inInput) {
     const ids = state.selectedNodes.size > 0
       ? [...state.selectedNodes]
@@ -775,9 +727,7 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // J — toggle connecting mode for the selected node(s)
   if (e.key === 'j' && !inInput && !e.ctrlKey && !e.metaKey) {
-    // Cancel if already in any connecting mode
     if (state.connectingFrom !== null || state.connectingFromMulti !== null) {
       state.connectingFrom = null;
       state.connectingFromMulti = null;
@@ -792,7 +742,6 @@ document.addEventListener('keydown', e => {
                    : null;
 
     if (multiIds) {
-      // Multi-source connecting mode: all selected nodes become connecting-source
       state.connectingFromMulti = new Set(multiIds);
       state.connectingFrom = null;
       state.selectedNodes.clear();
@@ -803,18 +752,15 @@ document.addEventListener('keydown', e => {
       statusValid.textContent = '● Click a target cell to connect all...';
       statusValid.className = 'running';
     } else if (singleId !== null) {
-      // Single-source connecting mode
       state.connectingFrom = singleId;
       const singleEl = document.getElementById(`node-${singleId}`);
       if (singleEl) { singleEl.classList.remove('multi-selected'); singleEl.classList.add('connecting-source'); }
       statusValid.textContent = '● Click another cell to connect...';
       statusValid.className = 'running';
-      statusValid.className = 'running';
     }
     return;
   }
 
-  // Ctrl+V — paste below
   if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !inInput) {
     if (!state.clipboard || state.clipboard.length === 0) return;
     e.preventDefault();

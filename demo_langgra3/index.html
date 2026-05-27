@@ -26,9 +26,7 @@
       </button>
 
       <div class="sidebar-section-label">RECENTS</div>
-      <ul id="recent-list">
-        <!-- populated by pipeline.js from localStorage -->
-      </ul>
+      <ul id="recent-list"></ul>
 
       <div class="sidebar-section-label" style="margin-top:auto;">CELLS</div>
       <div id="cell-palette">
@@ -51,7 +49,7 @@
           <span id="settings-title">Settings</span>
           <button id="settings-close">✕</button>
         </div>
-                <div id="settings-tabs-wrap">
+        <div id="settings-tabs-wrap">
         <div id="settings-tabs">
           <button class="settings-tab active" data-tab="general">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 4v3l2 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -72,44 +70,25 @@
           <!-- ── GENERAL TAB ── -->
           <div class="settings-tab-panel active" id="tab-general">
 
-          <!-- THEME -->
           <div class="settings-section">
             <div class="settings-section-label">THEME</div>
             <div class="settings-row theme-toggle-row">
-              <button class="theme-btn active" data-theme="dark">
-                <span class="theme-preview dark-preview"></span>
-                Dark
-              </button>
-              <button class="theme-btn" data-theme="light">
-                <span class="theme-preview light-preview"></span>
-                Light
-              </button>
+              <button class="theme-btn active" data-theme="dark"><span class="theme-preview dark-preview"></span>Dark</button>
+              <button class="theme-btn" data-theme="light"><span class="theme-preview light-preview"></span>Light</button>
             </div>
           </div>
 
-          <!-- BACKGROUND PATTERN -->
           <div class="settings-section">
             <div class="settings-section-label">BACKGROUND PATTERN</div>
             <div class="settings-row pattern-row">
-              <button class="pattern-btn active" data-pattern="cross" title="X 무늬">
-                <svg width="32" height="32" viewBox="0 0 32 32"><line x1="4" y1="4" x2="28" y2="28" stroke="currentColor" stroke-width="1.5"/><line x1="28" y1="4" x2="4" y2="28" stroke="currentColor" stroke-width="1.5"/></svg>
-              </button>
-              <button class="pattern-btn" data-pattern="dots" title="점 무늬">
-                <svg width="32" height="32" viewBox="0 0 32 32"><circle cx="8" cy="8" r="2" fill="currentColor"/><circle cx="24" cy="8" r="2" fill="currentColor"/><circle cx="8" cy="24" r="2" fill="currentColor"/><circle cx="24" cy="24" r="2" fill="currentColor"/></svg>
-              </button>
-              <button class="pattern-btn" data-pattern="grid" title="격자 무늬">
-                <svg width="32" height="32" viewBox="0 0 32 32"><path d="M0 8h32M0 16h32M0 24h32M8 0v32M16 0v32M24 0v32" stroke="currentColor" stroke-width="1" opacity="0.6"/></svg>
-              </button>
-              <button class="pattern-btn" data-pattern="diagonal" title="+ 무늬">
-                <svg width="32" height="32" viewBox="0 0 32 32"><line x1="8" y1="4" x2="8" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="24" y1="4" x2="24" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="20" y1="8" x2="28" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="8" y1="20" x2="8" y2="28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="4" y1="24" x2="12" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="24" y1="20" x2="24" y2="28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="20" y1="24" x2="28" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              </button>
-              <button class="pattern-btn" data-pattern="none" title="없음">
-                <svg width="32" height="32" viewBox="0 0 32 32"><line x1="4" y1="28" x2="28" y2="4" stroke="currentColor" stroke-width="1.5" opacity="0.4"/></svg>
-              </button>
+              <button class="pattern-btn active" data-pattern="cross" title="X 무늬"><svg width="32" height="32" viewBox="0 0 32 32"><line x1="4" y1="4" x2="28" y2="28" stroke="currentColor" stroke-width="1.5"/><line x1="28" y1="4" x2="4" y2="28" stroke="currentColor" stroke-width="1.5"/></svg></button>
+              <button class="pattern-btn" data-pattern="dots" title="점 무늬"><svg width="32" height="32" viewBox="0 0 32 32"><circle cx="8" cy="8" r="2" fill="currentColor"/><circle cx="24" cy="8" r="2" fill="currentColor"/><circle cx="8" cy="24" r="2" fill="currentColor"/><circle cx="24" cy="24" r="2" fill="currentColor"/></svg></button>
+              <button class="pattern-btn" data-pattern="grid" title="격자 무늬"><svg width="32" height="32" viewBox="0 0 32 32"><path d="M0 8h32M0 16h32M0 24h32M8 0v32M16 0v32M24 0v32" stroke="currentColor" stroke-width="1" opacity="0.6"/></svg></button>
+              <button class="pattern-btn" data-pattern="diagonal" title="+ 무늬"><svg width="32" height="32" viewBox="0 0 32 32"><line x1="8" y1="4" x2="8" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="24" y1="4" x2="24" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="20" y1="8" x2="28" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="8" y1="20" x2="8" y2="28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="4" y1="24" x2="12" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="24" y1="20" x2="24" y2="28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="20" y1="24" x2="28" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+              <button class="pattern-btn" data-pattern="none" title="없음"><svg width="32" height="32" viewBox="0 0 32 32"><line x1="4" y1="28" x2="28" y2="4" stroke="currentColor" stroke-width="1.5" opacity="0.4"/></svg></button>
             </div>
           </div>
 
-          <!-- CELL THEME -->
           <div class="settings-section">
             <div class="settings-section-label">CELL COLOR</div>
             <div class="settings-row cell-color-row" id="cell-color-row">
@@ -120,11 +99,10 @@
               <button class="cell-color-btn" data-color="#2e2218" style="--swatch:#2e2218;" title="Mocha"><span class="color-swatch"></span></button>
               <button class="cell-color-btn" data-color="#1f2937" style="--swatch:#1f2937;" title="Slate"><span class="color-swatch"></span></button>
               <button class="cell-color-btn" data-color="#ffffff" style="--swatch:#ffffff;" title="White"><span class="color-swatch"></span></button>
-              <button class="cell-color-btn rainbow-picker-btn"  data-picker="cell-color-custom" title="Custom"><span class="rainbow-swatch"></span></button>
+              <button class="cell-color-btn rainbow-picker-btn" data-picker="cell-color-custom" title="Custom"><span class="rainbow-swatch"></span></button>
             </div>
           </div>
 
-          <!-- I/O CELL COLORS -->
           <div class="settings-section">
             <div class="settings-section-label">INPUT CELL COLOR</div>
             <div class="settings-row cell-color-row">
@@ -153,7 +131,6 @@
             </div>
           </div>
 
-          <!-- CELL FONT -->
           <div class="settings-section">
             <div class="settings-section-label">CELL FONT</div>
             <div class="settings-row" style="gap:8px; flex-wrap:wrap; align-items:center;">
@@ -201,19 +178,12 @@
             </div>
           </div>
 
-          <!-- CELL SHAPE -->
           <div class="settings-section">
             <div class="settings-section-label">CELL SHAPE</div>
             <div class="settings-row cell-shape-row">
-              <button class="cell-shape-btn active" data-radius="10" title="Rounded">
-                <svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-              </button>
-              <button class="cell-shape-btn" data-radius="2" title="Square">
-                <svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-              </button>
-              <button class="cell-shape-btn" data-radius="12" title="Pill">
-                <svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-              </button>
+              <button class="cell-shape-btn active" data-radius="10" title="Rounded"><svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+              <button class="cell-shape-btn" data-radius="2" title="Square"><svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+              <button class="cell-shape-btn" data-radius="12" title="Pill"><svg width="36" height="24" viewBox="0 0 36 24"><rect x="2" y="2" width="32" height="20" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
             </div>
           </div>
 
@@ -221,63 +191,50 @@
 
           <!-- ── API KEYS TAB ── -->
           <div class="settings-tab-panel hidden" id="tab-apikeys">
-
             <div class="settings-section">
               <div class="settings-section-label">ANTHROPIC</div>
               <div class="field-group">
                 <label>API Key</label>
                 <div class="apikey-row">
                   <input type="password" id="apikey-anthropic" placeholder="sk-ant-..." autocomplete="off" spellcheck="false"/>
-                  <button class="apikey-toggle" data-target="apikey-anthropic" title="Show/Hide">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
-                  </button>
+                  <button class="apikey-toggle" data-target="apikey-anthropic" title="Show/Hide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>
                 </div>
                 <span class="apikey-hint">Claude models (claude-sonnet-4-6, claude-opus-4-6 …)</span>
               </div>
             </div>
-
             <div class="settings-section">
               <div class="settings-section-label">GOOGLE</div>
               <div class="field-group">
                 <label>API Key</label>
                 <div class="apikey-row">
                   <input type="password" id="apikey-google" placeholder="AIza..." autocomplete="off" spellcheck="false"/>
-                  <button class="apikey-toggle" data-target="apikey-google" title="Show/Hide">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
-                  </button>
+                  <button class="apikey-toggle" data-target="apikey-google" title="Show/Hide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>
                 </div>
                 <span class="apikey-hint">Gemini models (gemini-2.0-flash …)</span>
               </div>
             </div>
-
             <div class="settings-section">
               <div class="settings-section-label">OPENAI</div>
               <div class="field-group">
                 <label>API Key</label>
                 <div class="apikey-row">
                   <input type="password" id="apikey-openai" placeholder="sk-..." autocomplete="off" spellcheck="false"/>
-                  <button class="apikey-toggle" data-target="apikey-openai" title="Show/Hide">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
-                  </button>
+                  <button class="apikey-toggle" data-target="apikey-openai" title="Show/Hide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>
                 </div>
                 <span class="apikey-hint">GPT models (gpt-4o …)</span>
               </div>
             </div>
-
             <div class="settings-section">
               <div class="settings-section-label">E2B</div>
               <div class="field-group">
                 <label>E2B API Key</label>
                 <div class="apikey-row">
                   <input type="password" id="apikey-e2b" placeholder="e2b_..." autocomplete="off" spellcheck="false"/>
-                  <button class="apikey-toggle" data-target="apikey-e2b" title="Show/Hide">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg>
-                  </button>
+                  <button class="apikey-toggle" data-target="apikey-e2b" title="Show/Hide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>
                 </div>
                 <span class="apikey-hint">Code Interpreter 샌드박스 실행에 사용</span>
               </div>
             </div>
-
             <div class="settings-section">
               <div class="settings-section-label">BACKEND URL</div>
               <div class="field-group">
@@ -286,18 +243,15 @@
                 <span class="apikey-hint">Python 백엔드 서버 주소</span>
               </div>
             </div>
-
           </div>
 
           <!-- ── STRICTNESS TAB ── -->
           <div class="settings-tab-panel hidden" id="tab-strictness">
-
             <div class="settings-section">
               <div class="settings-section-label">HUMAN REVIEW STRICTNESS</div>
               <div class="field-group">
                 <label>Strictness — <span id="hr-strictness-label">Low</span></label>
-                <input type="range" id="hr-strictness-slider" min="0" max="2" step="1" value="0"
-                  style="width:100%;accent-color:var(--accent)"/>
+                <input type="range" id="hr-strictness-slider" min="0" max="2" step="1" value="0" style="width:100%;accent-color:var(--accent)"/>
                 <div style="display:flex;justify-content:space-between;margin-top:4px">
                   <span class="apikey-hint">Low</span>
                   <span class="apikey-hint">Medium</span>
@@ -306,7 +260,6 @@
                 <span class="apikey-hint" id="hr-strictness-desc">L2+ (Mutating, Network) 자동 리뷰</span>
               </div>
             </div>
-
             <div class="settings-section">
               <div class="settings-section-label">LEVEL GUIDE</div>
               <div class="field-group">
@@ -318,13 +271,11 @@
                 </div>
               </div>
             </div>
-
             <div class="settings-section">
               <div class="settings-section-label">CODE REVIEW</div>
               <div class="field-group">
                 <label>Max Retries</label>
-                <input type="range" id="max-retries-slider" min="0" max="4" step="1" value="0"
-                  style="width:100%;accent-color:var(--accent)"/>
+                <input type="range" id="max-retries-slider" min="0" max="4" step="1" value="0" style="width:100%;accent-color:var(--accent)"/>
                 <div class="retry-labels-row">
                   <span class="retry-label">3</span>
                   <span class="retry-label">5</span>
@@ -334,13 +285,11 @@
                 </div>
                 <div class="retry-input-row">
                   <span class="apikey-hint">직접 입력:</span>
-                  <input type="number" id="max-retries-input" min="1" value="3"
-                    class="retry-number-input"/>
+                  <input type="number" id="max-retries-input" min="1" value="3" class="retry-number-input"/>
                 </div>
                 <span class="apikey-hint" id="max-retries-desc">LLM 코드 생성 최대 재시도 횟수</span>
               </div>
             </div>
-
           </div>
 
         </div><!-- /settings-body -->
@@ -379,26 +328,17 @@
       <!-- CANVAS -->
       <div id="canvas-wrap" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
         <canvas id="edge-canvas"></canvas>
-        <div id="canvas">
-          <!-- nodes rendered by JS -->
-        </div>
+        <div id="canvas"></div>
         <div id="canvas-hint">← Drag cells from the left panel to begin</div>
         <div id="cell-tooltip" class="hidden"></div>
-        <!-- TOOL TRAY -->
         <div id="tool-tray">
           <button id="tool-cursor" class="tool-btn active" title="Select / Move nodes">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 1 L12 7 L7 8.5 L5.5 13 Z" fill="currentColor"/>
-            </svg>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 1 L12 7 L7 8.5 L5.5 13 Z" fill="currentColor"/></svg>
           </button>
           <button id="tool-pan" class="tool-btn" title="Pan canvas">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7 1L5.8 2.2M7 1L8.2 2.2M7 13L5.8 11.8M7 13L8.2 11.8M1 7L2.2 5.8M1 7L2.2 8.2M13 7L11.8 5.8M13 7L11.8 8.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              <path d="M5.5 4a1 1 0 011-1 1 1 0 011 1v2.5h.5a1 1 0 011 1v.5h.25a1 1 0 011 1V10a2.5 2.5 0 01-2.5 2.5H6A2.5 2.5 0 013.5 10V5a1 1 0 011-1 1 1 0 011 1z" fill="currentColor"/>
-            </svg>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L5.8 2.2M7 1L8.2 2.2M7 13L5.8 11.8M7 13L8.2 11.8M1 7L2.2 5.8M1 7L2.2 8.2M13 7L11.8 5.8M13 7L11.8 8.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 4a1 1 0 011-1 1 1 0 011 1v2.5h.5a1 1 0 011 1v.5h.25a1 1 0 011 1V10a2.5 2.5 0 01-2.5 2.5H6A2.5 2.5 0 013.5 10V5a1 1 0 011-1 1 1 0 011 1z" fill="currentColor"/></svg>
           </button>
         </div>
-        <!-- ZOOM CONTROLS -->
         <div id="zoom-bar">
           <button id="zoom-out" title="축소">−</button>
           <input id="zoom-pct" type="number" value="100" min="30" max="250" title="줌 %"/>
@@ -408,7 +348,7 @@
         </div>
       </div>
 
-      <!-- ERROR SLIDE PANEL (캔버스 위에서 올라옴) -->
+      <!-- ERROR PANEL -->
       <div id="error-panel">
         <div id="error-panel-header">
           <span id="error-panel-title">ERRORS</span>
@@ -417,7 +357,6 @@
         <ul id="error-panel-list"></ul>
       </div>
 
-      <!-- ERROR LOG BUTTON (캔버스 좌하단) -->
       <div id="error-log-btn-wrap">
         <button id="status-validity" class="status-validity-btn">● Ready</button>
       </div>
@@ -429,7 +368,6 @@
         <button id="inspector-close">✕</button>
       </div>
 
-      <!-- TABS -->
       <div id="inspector-tabs">
         <button class="inspector-tab active" data-tab="config">Config</button>
         <button class="inspector-tab" data-tab="result">Result</button>
@@ -458,25 +396,17 @@
             <span style="font-size:11px; color:var(--text3); margin-top:4px; display:block;">ollama list 에서 확인한 모델명을 입력하세요</span>
           </div>
         </div>
+
+        <!-- I/O Schema 버튼 (Type 텍스트 필드 제거, Schema 버튼만) -->
         <div class="field-row" id="f-row-types">
-          <div class="field-group" id="f-group-input-type">
-            <label>Input Type <span class="required">*</span></label>
-            <input type="text" id="f-input-type" placeholder="e.g. VideoFile" />
+          <div class="field-group" id="f-group-input-schema">
+            <label>Input Schema</label>
+            <button type="button" class="schema-btn schema-btn-full" id="btn-schema-input" title="JSON Schema 정의">{ } Define Input Schema</button>
           </div>
-          <div class="field-group" id="f-group-output-type">
-            <label>Output Type <span class="required">*</span></label>
-            <input type="text" id="f-output-type" placeholder="e.g. TextFile" />
+          <div class="field-group" id="f-group-output-schema">
+            <label>Output Schema</label>
+            <button type="button" class="schema-btn schema-btn-full" id="btn-schema-output" title="JSON Schema 정의">{ } Define Output Schema</button>
           </div>
-        </div>
-
-        <div class="field-group" id="f-group-input-desc">
-          <label>Input Description <span class="required">*</span></label>
-          <textarea id="f-input-desc" placeholder="Describe what this cell receives..." rows="2"></textarea>
-        </div>
-
-        <div class="field-group" id="f-group-output-desc">
-          <label>Output Description <span class="required">*</span></label>
-          <textarea id="f-output-desc" placeholder="Describe what this cell produces..." rows="2"></textarea>
         </div>
 
         <div class="field-group">
@@ -541,6 +471,12 @@
           </div>
           <pre id="result-schema" class="result-code-block"></pre>
         </div>
+        <div class="result-section" id="result-assertion" style="display:none;">
+          <div class="result-section-header">
+            <span class="result-section-label">I/O Assertion</span>
+          </div>
+          <div id="result-assertion-list"></div>
+        </div>
       </div>
     </aside>  </div>
 
@@ -553,10 +489,8 @@
     </div>
   </div>
 
-  <!-- CONTEXT MENU -->
   <div id="ctx-menu"></div>
 
-  <!-- CONFIRM DIALOG -->
   <div id="confirm-overlay" class="hidden">
     <div id="confirm-modal">
       <div id="confirm-title"></div>
@@ -568,15 +502,12 @@
     </div>
   </div>
 
-  <!-- LOAD PROJECT POPUP -->
   <div id="load-overlay" class="hidden">
     <div id="load-modal">
       <div id="load-header">
         <span id="load-title">Load Project</span>
         <button id="load-close">✕</button>
       </div>
-
-      <!-- 드래그 앤 드롭 존 -->
       <div id="load-dropzone">
         <div id="load-dropzone-inner">
           <span id="load-drop-icon">⬆</span>
@@ -585,14 +516,11 @@
           <input type="file" id="load-file-input" accept=".json" multiple style="display:none" />
         </div>
       </div>
-
       <div id="load-search-wrap">
         <input id="load-search" type="text" placeholder="프로젝트 검색..." spellcheck="false" />
       </div>
       <div id="load-list-wrap">
-        <ul id="load-file-list">
-          <!-- populated by js -->
-        </ul>
+        <ul id="load-file-list"></ul>
         <div id="load-empty">저장된 프로젝트가 없습니다.<br><span id="load-empty-sub">위에서 파일을 추가해보세요.</span></div>
       </div>
       <div id="load-footer">
@@ -615,56 +543,59 @@
         </div>
         <button id="hr-close">✕</button>
       </div>
-
       <div id="hr-body">
-        <!-- 요약 -->
-        <div id="hr-summary-block">
-          <div class="hr-section-label">AI 요약</div>
-          <div id="hr-summary"></div>
-        </div>
-
-        <!-- 신뢰도 바 -->
+        <div id="hr-summary-block"><div class="hr-section-label">AI 요약</div><div id="hr-summary"></div></div>
         <div id="hr-confidence-block">
-          <div class="hr-conf-row">
-            <span class="hr-conf-label">AI 신뢰도</span>
-            <span id="hr-conf-value">—</span>
-          </div>
-          <div class="hr-conf-track">
-            <div id="hr-conf-fill"></div>
-          </div>
+          <div class="hr-conf-row"><span class="hr-conf-label">AI 신뢰도</span><span id="hr-conf-value">—</span></div>
+          <div class="hr-conf-track"><div id="hr-conf-fill"></div></div>
         </div>
-
-        <!-- 항목별 검토 -->
-        <div id="hr-items-block">
-          <div class="hr-section-label">항목별 검토</div>
-          <div id="hr-items-list"></div>
-        </div>
-
-        <!-- 리스크 -->
-        <div id="hr-risks-block">
-          <div class="hr-section-label">리스크</div>
-          <div id="hr-risks-list"></div>
-        </div>
-
-        <!-- 생성된 코드 미리보기 -->
-        <div id="hr-code-block">
-          <div class="hr-section-label">생성된 코드</div>
-          <pre id="hr-code-preview"></pre>
-        </div>
-
-        <!-- 수정 요청 메시지 (재작성 선택 시 표시) -->
+        <div id="hr-items-block"><div class="hr-section-label">항목별 검토</div><div id="hr-items-list"></div></div>
+        <div id="hr-risks-block"><div class="hr-section-label">리스크</div><div id="hr-risks-list"></div></div>
+        <div id="hr-code-block"><div class="hr-section-label">생성된 코드</div><pre id="hr-code-preview"></pre></div>
         <div id="hr-rewrite-block" class="hidden">
           <div class="hr-section-label">재작성 요청 메시지</div>
           <textarea id="hr-rewrite-msg" placeholder="수정 방향을 구체적으로 입력하세요..."></textarea>
         </div>
       </div>
-
-      <!-- 액션 버튼 -->
       <div id="hr-actions">
         <span id="hr-actions-label">검증 결정:</span>
         <button id="hr-btn-approve" class="hr-btn hr-btn-approve">✓ 승인</button>
         <button id="hr-btn-rewrite" class="hr-btn hr-btn-modify">↺ 재작성 요청</button>
         <button id="hr-btn-reject"  class="hr-btn hr-btn-reject">✕ 거절</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHEMA EDITOR MODAL -->
+  <div id="schema-modal-overlay" class="hidden">
+    <div id="schema-modal">
+      <div id="schema-modal-header">
+        <span id="schema-modal-title">INPUT SCHEMA</span>
+        <button id="schema-modal-close">✕</button>
+      </div>
+      <div id="schema-modal-body">
+        <div id="schema-tabs">
+          <button class="schema-tab-btn active" data-schema-tab="visual">Visual</button>
+          <button class="schema-tab-btn" data-schema-tab="raw">Raw JSON</button>
+        </div>
+        <div id="schema-visual-panel">
+          <div class="schema-prop-header">
+            <span>Key</span>
+            <span>Type</span>
+            <span></span>
+          </div>
+          <div id="schema-props-list"></div>
+          <button id="schema-add-prop-btn">＋ Add property</button>
+        </div>
+        <div id="schema-raw-wrap" style="display:none;">
+          <textarea id="schema-raw-textarea" spellcheck="false" placeholder='{\n  "type": "object",\n  "properties": {\n    "key": { "type": "string" }\n  }\n}'></textarea>
+          <span id="schema-parse-error-msg"></span>
+        </div>
+      </div>
+      <div id="schema-modal-footer">
+        <button class="schema-footer-btn clear" id="schema-clear-btn">Clear</button>
+        <button class="schema-footer-btn cancel" id="schema-cancel-btn">Cancel</button>
+        <button class="schema-footer-btn save" id="schema-save-btn">Save</button>
       </div>
     </div>
   </div>
@@ -677,7 +608,6 @@
 
   <div id="color-popup" class="hidden"><span id="color-popup-preview"></span><span id="color-popup-hex">#000000</span></div>
 
-  <!-- CUSTOM COLOR POPUP -->
   <div id="custom-color-popup" class="hidden">
     <div id="ccp-hue-strip"><div id="ccp-hue-thumb"></div></div>
     <div id="ccp-sv-box"><canvas id="ccp-canvas" width="180" height="140"></canvas><div id="ccp-sv-cursor"></div></div>
@@ -694,8 +624,7 @@
   <script src="js/inspector.js"></script>
   <script src="js/edit.js"></script>
   <script src="js/settings.js"></script>
-  <!-- <script src="js/pipeline.js"></script> -->
-   <script src="js/store.js"></script>
+  <script src="js/store.js"></script>
   <script src="js/project-ui.js"></script>
   <script src="js/runner.js"></script>
   <script src="js/hitl.js"></script>

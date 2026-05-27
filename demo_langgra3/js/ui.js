@@ -1,23 +1,22 @@
 /* ── HELPER FUNCTIONS ─────────────────────────── */
 
+/* upstream output contract → downstream input contract 동기화 (canvas.js에도 정의됨, 여기서는 alias) */
 function applyInputCopy(fromNode, toNode) {
-  toNode.inputType = fromNode.outputType;
-  toNode.inputDesc = fromNode.outputDesc;
-  const ni = document.getElementById(`ni-${toNode.id}`);
-  if (ni) ni.textContent = toNode.inputType || '—';
-  if (state.selectedNode === toNode.id) {
-    document.getElementById('f-input-type').value = toNode.inputType;
-    document.getElementById('f-input-desc').value = toNode.inputDesc;
+  // 구버전 호환: contract 기반으로 전환됐으므로 contract가 있으면 그걸 씀
+  if (fromNode.outputContract) {
+    toNode.inputContract = JSON.parse(JSON.stringify(fromNode.outputContract));
+    if (typeof updateNodeIODisplay === 'function') updateNodeIODisplay(toNode.id);
   }
 }
 
 function finalizeEdge(from, to, fromNode, toNode) {
   pushHistory();
-  const valid = !!(fromNode.outputType && toNode.inputType && fromNode.outputType === toNode.inputType);
-  state.edges.push({ from, to, valid });
+  // 엣지는 항상 valid — 문자열 비교 제거
+  state.edges.push({ from, to, valid: true });
   drawEdges();
   validatePipeline();
 }
+
 /* ── MODAL ────────────────────────────────────── */
 function showModal(title, bodyHTML) {
   document.getElementById('modal-title').textContent = title;
@@ -32,6 +31,7 @@ document.getElementById('modal-close').addEventListener('click', () => {
 modalOverlay.addEventListener('click', e => {
   if (e.target === modalOverlay) modalOverlay.classList.add('hidden');
 });
+
 /* ── CONFIRM DIALOG ───────────────────────────── */
 function showConfirm(title, bodyHTML, onYes, onNo) {
   document.getElementById('confirm-title').textContent = title;
@@ -56,12 +56,8 @@ function showConfirm(title, bodyHTML, onYes, onNo) {
   }
   document.addEventListener('keydown', onKey);
 
-  document.getElementById('confirm-yes').addEventListener('click', () => {
-    closeConfirm(); onYes();
-  });
-  document.getElementById('confirm-no').addEventListener('click', () => {
-    closeConfirm(); if (onNo) onNo();
-  });
+  document.getElementById('confirm-yes').addEventListener('click', () => { closeConfirm(); onYes(); });
+  document.getElementById('confirm-no').addEventListener('click',  () => { closeConfirm(); if (onNo) onNo(); });
 }
 
 /* ── MEMO TOOLTIP ─────────────────────────────── */
@@ -76,13 +72,11 @@ function showTooltip(nodeEl, node) {
   cellTooltip.textContent = node.memo;
   cellTooltip.classList.remove('hidden');
 
-  // Position: right of node, or left if too close to edge
   const tw = cellTooltip.offsetWidth || 220;
   const th = cellTooltip.offsetHeight || 60;
   let tx = (nr.right - wrap.left + 12) / state.zoom;
   let ty = (nr.top   - wrap.top  + (nr.height - th) / 2) / state.zoom;
 
-  // Clamp within canvas
   const canvasW = wrap.width / state.zoom;
   if (tx + tw > canvasW - 10) tx = (nr.left - wrap.left - tw - 12) / state.zoom;
   if (ty < 8) ty = 8;
@@ -97,7 +91,6 @@ function hideTooltip() {
   cellTooltip.classList.add('hidden');
 }
 
-// Attach hover listeners when a node is rendered
 function attachTooltipListeners(el, node) {
   el.addEventListener('mouseenter', () => {
     clearTimeout(tooltipTimer);

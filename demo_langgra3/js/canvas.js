@@ -40,9 +40,9 @@ function handleDrop(e) {
   createNode(dragType, x, y);
   dragType = null;
 }
+
 /* ── CREATE NODE ──────────────────────────────── */
 function createNode(type, x, y) {
-  // Enforce single input / single output
   if (type === 'input' || type === 'output') {
     const existing = state.nodes.find(n => n.type === type);
     if (existing) {
@@ -61,10 +61,11 @@ function createNode(type, x, y) {
   const node = {
     id, type,
     name: `${labels[type] || 'CELL'} ${id}`,
-    x,
-    y,
-    model: '', inputType: '', outputType: '',
-    inputDesc: '', outputDesc: '', prompt: '',
+    x, y,
+    model: '',
+    inputContract: null,
+    outputContract: null,
+    prompt: '',
     webSearch: false, domains: '',
     memo: '',
     status: 'pending',
@@ -73,6 +74,12 @@ function createNode(type, x, y) {
   renderNode(node);
   hint.classList.add('hidden');
   validatePipeline();
+}
+
+/* contract의 properties를 "key: type" 줄 목록으로 변환 */
+function _contractLines(contract) {
+  if (!contract || !contract.properties) return [];
+  return Object.entries(contract.properties).map(([k, v]) => `${k}: ${v.type || '?'}`);
 }
 
 function renderNode(node) {
@@ -106,40 +113,17 @@ function renderNode(node) {
   // I/O rows
   const ioWrap = document.createElement('div');
   ioWrap.className = 'cell-node-io';
+  ioWrap.id = 'io-' + node.id;
 
   if (showIN) {
-    const row = document.createElement('div');
-    row.className = 'cell-io-row';
-    const lbl = document.createElement('span');
-    lbl.className = 'cell-io-label io-label-text';
-    lbl.textContent = 'IN';
-    const typ = document.createElement('span');
-    typ.className = 'cell-io-type';
-    typ.id = 'ni-' + node.id;
-    typ.textContent = node.inputType || '—';
-    row.appendChild(lbl);
-    row.appendChild(typ);
-    ioWrap.appendChild(row);
+    _renderIOSection(ioWrap, node, 'input');
   }
-
   if (showOUT) {
-    const row = document.createElement('div');
-    row.className = 'cell-io-row';
-    const lbl = document.createElement('span');
-    lbl.className = 'cell-io-label io-label-text';
-    lbl.textContent = 'OUT';
-    const typ = document.createElement('span');
-    typ.className = 'cell-io-type output';
-    typ.id = 'no-' + node.id;
-    typ.textContent = node.outputType || '—';
-    row.appendChild(lbl);
-    row.appendChild(typ);
-    ioWrap.appendChild(row);
+    _renderIOSection(ioWrap, node, 'output');
   }
 
   el.appendChild(ioWrap);
 
-  // Click: select / connect
   el.addEventListener('click', e => {
     e.stopPropagation();
     if (_nodeDragMoved) { _nodeDragMoved = false; return; }
@@ -147,7 +131,6 @@ function renderNode(node) {
     handleNodeClick(node.id);
   });
 
-  // Drag to move (disabled in pan mode)
   el.addEventListener('mousedown', e => {
     if (_toolMode === 'pan') return;
     if (state.connectingFrom !== null || state.connectingFromMulti !== null) return;
@@ -179,6 +162,57 @@ function renderNode(node) {
   canvas.appendChild(el);
 }
 
+/* I/O 섹션 렌더 헬퍼 (IN / OUT 공통) */
+function _renderIOSection(container, node, side) {
+  const isInput   = side === 'input';
+  const contract  = isInput ? node.inputContract : node.outputContract;
+  const lines     = _contractLines(contract);
+  const labelText = isInput ? 'IN' : 'OUT';
+  const typeClass = isInput ? 'cell-io-type' : 'cell-io-type output';
+
+  if (lines.length === 0) {
+    // contract 미정의: 단순 라벨만
+    const row = document.createElement('div');
+    row.className = 'cell-io-row';
+    const lbl = document.createElement('span');
+    lbl.className = 'cell-io-label io-label-text';
+    lbl.textContent = labelText;
+    const typ = document.createElement('span');
+    typ.className = typeClass;
+    typ.id = (isInput ? 'ni-' : 'no-') + node.id;
+    typ.textContent = '—';
+    row.appendChild(lbl);
+    row.appendChild(typ);
+    container.appendChild(row);
+  } else {
+    // contract 정의됨: 첫 줄에 라벨, 각 property를 "key: type"으로 표시
+    lines.forEach((line, i) => {
+      const row = document.createElement('div');
+      row.className = 'cell-io-row';
+      const lbl = document.createElement('span');
+      lbl.className = 'cell-io-label io-label-text';
+      lbl.textContent = i === 0 ? labelText : '';
+      const typ = document.createElement('span');
+      typ.className = typeClass;
+      if (i === 0) typ.id = (isInput ? 'ni-' : 'no-') + node.id;
+      typ.textContent = line;
+      row.appendChild(lbl);
+      row.appendChild(typ);
+      container.appendChild(row);
+    });
+  }
+}
+
+/* 노드 I/O 표시 업데이트 (contract 변경 후 호출) */
+function updateNodeIODisplay(nodeId) {
+  const node   = state.nodes.find(n => n.id === nodeId);
+  const ioWrap = document.getElementById('io-' + nodeId);
+  if (!node || !ioWrap) return;
+
+  ioWrap.innerHTML = '';
+  if (node.type !== 'output') _renderIOSection(ioWrap, node, 'input');
+  if (node.type !== 'input')  _renderIOSection(ioWrap, node, 'output');
+}
 
 /* ── GHOST ELEMENTS (Ctrl+drag preview) ──────── */
 const ghostLayer = document.createElement('div');
@@ -223,10 +257,9 @@ document.addEventListener('mouseup', e => {
   const d = state.dragging;
   state.dragging = null;
 
-  if (d.hasMoved) _nodeDragMoved = true; // suppress the click event that follows
+  if (d.hasMoved) _nodeDragMoved = true;
 
   if (d.isCtrlDrag && d.hasMoved) {
-    // Drop: clear ghosts, create real clones at ghost positions
     clearGhosts();
     const dx = (e.clientX - d.startX) / state.zoom;
     const dy = (e.clientY - d.startY) / state.zoom;
@@ -240,9 +273,9 @@ document.addEventListener('mouseup', e => {
     validatePipeline();
   }
 });
+
 /* ── NODE CLICK / CONNECT ─────────────────────── */
 function handleNodeClick(id) {
-  // ── Multi-source connecting mode: complete all edges to this target ──
   if (state.connectingFromMulti !== null) {
     const sources = [...state.connectingFromMulti].filter(sid => sid !== id);
     state.connectingFromMulti = null;
@@ -251,16 +284,13 @@ function handleNodeClick(id) {
     state.selectedNode = null;
 
     const toNode = state.nodes.find(n => n.id === id);
-    let pendingConfirms = [];
 
     sources.forEach(from => {
       const fromNode = state.nodes.find(n => n.id === from);
       if (!fromNode || !toNode) return;
       if (from === id) return;
+      if (toNode.y <= fromNode.y) return;
 
-      if (toNode.y <= fromNode.y) return; // skip invalid direction silently
-
-      // Toggle: if edge already exists, remove it (disconnect)
       const existingEdge = state.edges.find(e => e.from === from && e.to === id);
       if (existingEdge) {
         pushHistory();
@@ -269,31 +299,20 @@ function handleNodeClick(id) {
         return;
       }
 
-      if (fromNode.outputType) {
-        const hasExistingInput = !!(toNode.inputType || toNode.inputDesc);
-        if (!hasExistingInput) {
-          applyInputCopy(fromNode, toNode);
-        }
-        // Skip per-edge confirm dialogs in multi-mode; just finalize
-      }
-      finalizeEdge(from, id, fromNode, toNode);
+      _attemptConnect(from, id, fromNode, toNode);
     });
 
     validatePipeline();
     return;
   }
 
-  // If multiple nodes are selected (lasso/ctrl), a single click on one node
-  // should collapse to single-select (blue border + inspector) for that node.
   if (state.connectingFrom === null && state.selectedNodes.size > 1) {
     selectNode(id);
     return;
   }
 
   if (state.connectingFrom === null) {
-    // First click: start connection OR open inspector
     if (state.selectedNode === id) {
-      // Already selected → start connecting
       state.connectingFrom = id;
       document.getElementById(`node-${id}`).classList.add('connecting-source');
       statusValid.textContent = '● Click another cell to connect...';
@@ -303,7 +322,6 @@ function handleNodeClick(id) {
     }
     selectNode(id);
   } else {
-    // Second click: complete connection
     const from = state.connectingFrom;
     const to   = id;
     state.connectingFrom = null;
@@ -311,7 +329,6 @@ function handleNodeClick(id) {
 
     if (from === to) { validatePipeline(); return; }
 
-    // 이미 from→to 연결이 존재하면 클릭 시 해제
     const existingEdge = state.edges.find(e => e.from === from && e.to === to);
     if (existingEdge) {
       pushHistory();
@@ -321,44 +338,75 @@ function handleNodeClick(id) {
       return;
     }
 
-    // No reverse or same-level connections
     const fromNode = state.nodes.find(n => n.id === from);
     const toNode   = state.nodes.find(n => n.id === to);
     if (toNode.y <= fromNode.y) {
       const reason = toNode.y === fromNode.y
-        ? '<p>같은 Y축 위치의 셀은 연결할 수 없습니다. 병렬 셀은 아래에 배치한 뒤 연결하세요.</p>'
+        ? '<p>같은 Y축 위치의 셀은 연결할 수 없습니다.</p>'
         : '<p>역방향 연결은 허용되지 않습니다. 연결은 위→아래 방향으로만 가능합니다.</p>';
       showModal('Connection Not Allowed', reason);
       validatePipeline();
       return;
     }
 
-    // Remove existing edge from→to if any
     state.edges = state.edges.filter(e => !(e.from === from && e.to === to));
+    _attemptConnect(from, to, fromNode, toNode);
+  }
+}
 
-    // Auto-copy output → input
-    if (fromNode.outputType) {
-      const hasExistingInput = !!(toNode.inputType || toNode.inputDesc);
-      const isSame = toNode.inputType === fromNode.outputType && toNode.inputDesc === fromNode.outputDesc;
+/**
+ * 연결 시도: upstream output contract → downstream input contract 동기화
+ * - downstream에 이미 contract가 있으면 덮어쓰기 confirm
+ * - 없으면 자동 동기화
+ */
+function _attemptConnect(from, to, fromNode, toNode) {
+  const fromContract = fromNode.outputContract;
+  const toContract   = toNode.inputContract;
 
-      if (hasExistingInput && !isSame) {
-        showConfirm(
-          '후행 셀 Input 덮어쓰기',
-          `<p>선행 셀의 Output으로 후행 셀 <strong>"${toNode.name}"</strong>의 Input을 덮어쓰겠습니까?</p>
-           <div class="confirm-diff">
-             <div><span class="diff-label">현재 Input Type</span><code>${toNode.inputType || '(없음)'}</code></div>
-             <div><span class="diff-label">대체될 값 (Output Type)</span><code>${fromNode.outputType}</code></div>
-           </div>`,
-          () => { applyInputCopy(fromNode, toNode); finalizeEdge(from, to, fromNode, toNode); },
-          () => { finalizeEdge(from, to, fromNode, toNode); }
-        );
-        return;
-      } else if (!hasExistingInput) {
-        applyInputCopy(fromNode, toNode);
-      }
-    }
+  const hasFromContract = fromContract && fromContract.properties && Object.keys(fromContract.properties).length > 0;
+  const hasToContract   = toContract   && toContract.properties   && Object.keys(toContract.properties).length > 0;
 
+  if (!hasFromContract) {
+    // upstream에 contract 없음 → 그냥 연결
     finalizeEdge(from, to, fromNode, toNode);
+    return;
+  }
+
+  if (!hasToContract) {
+    // downstream에 contract 없음 → 자동 동기화
+    _syncInputContract(fromNode, toNode);
+    finalizeEdge(from, to, fromNode, toNode);
+    return;
+  }
+
+  // 양쪽 모두 contract 있음 → 덮어쓰기 confirm
+  const fromKeys = Object.keys(fromContract.properties).map(k => `${k}: ${fromContract.properties[k].type}`).join(', ');
+  const toKeys   = Object.keys(toContract.properties).map(k => `${k}: ${toContract.properties[k].type}`).join(', ');
+  showConfirm(
+    'Input Schema 덮어쓰기',
+    `<p><strong>"${toNode.name}"</strong>의 Input Schema를 upstream Output Schema로 덮어쓰겠습니까?</p>
+     <div class="confirm-diff">
+       <div><span class="diff-label">현재 Input Schema</span><code>${toKeys}</code></div>
+       <div><span class="diff-label">대체될 값 (Upstream Output)</span><code>${fromKeys}</code></div>
+     </div>`,
+    () => {
+      _syncInputContract(fromNode, toNode);
+      finalizeEdge(from, to, fromNode, toNode);
+    },
+    () => {
+      // 취소: contract 동기화 없이 연결만
+      finalizeEdge(from, to, fromNode, toNode);
+    }
+  );
+}
+
+/* upstream output contract → downstream input contract 복사 + DOM 업데이트 */
+function _syncInputContract(fromNode, toNode) {
+  toNode.inputContract = JSON.parse(JSON.stringify(fromNode.outputContract));
+  updateNodeIODisplay(toNode.id);
+  // Inspector가 이 노드를 보고 있으면 버튼 상태도 갱신
+  if (state.selectedNode === toNode.id && typeof _updateSchemaBtnState === 'function') {
+    _updateSchemaBtnState('input', toNode.inputContract);
   }
 }
 
@@ -375,7 +423,6 @@ function selectNode(id) {
 
 function handleCtrlClick(id) {
   if (state.connectingFrom !== null) return;
-  // Close single-select inspector if switching to multi
   if (state.selectedNodes.size === 1 && state.selectedNode !== null) {
     closeInspector();
   }
@@ -387,7 +434,6 @@ function handleCtrlClick(id) {
     state.selectedNode = null;
     document.getElementById(`node-${id}`)?.classList.add('multi-selected');
   }
-  // If exactly one remains, treat as normal select
   if (state.selectedNodes.size === 1) {
     const onlyId = [...state.selectedNodes][0];
     selectNode(onlyId);
@@ -399,18 +445,17 @@ function clearSelection() {
   state.selectedNodes.clear();
   document.querySelectorAll('.cell-node').forEach(el => el.classList.remove('selected', 'multi-selected'));
 }
+
 /* ── BOX SELECT (lasso) ───────────────────────── */
 const lassoRect = document.createElement('div');
 lassoRect.id = 'lasso-rect';
 document.getElementById('canvas-wrap').appendChild(lassoRect);
 
-let _lassoDidDrag = false; // suppress canvas click after a real lasso drag
+let _lassoDidDrag = false;
 
-/* canvas-wrap mousedown: start lasso OR pan */
 document.getElementById('canvas-wrap').addEventListener('mousedown', e => {
   if (e.button !== 0) return;
 
-  /* ── PAN MODE ── */
   if (_toolMode === 'pan') {
     const canvasWrap = document.getElementById('canvas-wrap');
     canvasWrap.style.cursor = 'grabbing';
@@ -418,12 +463,9 @@ document.getElementById('canvas-wrap').addEventListener('mousedown', e => {
     const startY    = e.clientY;
     const startPanX = state.panX || 0;
     const startPanY = state.panY || 0;
-    const canvasEl  = document.getElementById('canvas');
     function onPanMove(ev) {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      state.panX = startPanX + dx;
-      state.panY = startPanY + dy;
+      state.panX = startPanX + (ev.clientX - startX);
+      state.panY = startPanY + (ev.clientY - startY);
       applyTransform();
     }
     function onPanUp() {
@@ -436,7 +478,6 @@ document.getElementById('canvas-wrap').addEventListener('mousedown', e => {
     return;
   }
 
-  /* ── CURSOR MODE: lasso ── */
   if (state.connectingFrom !== null) return;
   if (state.dragging) return;
   const onCell = e.target.closest('.cell-node');
@@ -490,7 +531,6 @@ document.addEventListener('mousemove', e => {
 
   const dx = e.clientX - state.boxSelect.clientStartX;
   const dy = e.clientY - state.boxSelect.clientStartY;
-  // Show lasso only after a small movement threshold
   if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
     lassoRect.style.display = 'block';
   }
@@ -517,19 +557,17 @@ document.addEventListener('mouseup', e => {
 
   const dx = e.clientX - bs.clientStartX;
   const dy = e.clientY - bs.clientStartY;
-  // If no real drag, treat as canvas background click (handled by canvas click listener)
   if (Math.abs(dx) <= 4 && Math.abs(dy) <= 4) return;
 
-  _lassoDidDrag = true; // suppress the canvas click event that follows
+  _lassoDidDrag = true;
 
   const selX1 = Math.min(bs.startX, endX);
   const selY1 = Math.min(bs.startY, endY);
   const selX2 = Math.max(bs.startX, endX);
   const selY2 = Math.max(bs.startY, endY);
 
-  // Find all nodes whose bounding box intersects the lasso
   const NODE_W = 180;
-  const NODE_H = 110; // approx height
+  const NODE_H = 110;
   const hit = state.nodes.filter(n => {
     const el = document.getElementById(`node-${n.id}`);
     const nh = el ? el.offsetHeight : NODE_H;
@@ -539,14 +577,12 @@ document.addEventListener('mouseup', e => {
   });
 
   if (hit.length === 0) {
-    // Clicked empty space — deselect
     clearSelection();
     closeInspector();
     drawEdges();
     return;
   }
 
-  // Select all hit nodes as multi-selected (green border)
   closeInspector();
   state.selectedNode = null;
   state.selectedEdge = null;
@@ -559,9 +595,7 @@ document.addEventListener('mouseup', e => {
   drawEdges();
 });
 
-
 canvas.addEventListener('click', e => {
-  // Suppress click event that fires right after a lasso drag
   if (_lassoDidDrag) { _lassoDidDrag = false; return; }
 
   if (state.connectingFrom !== null || state.connectingFromMulti !== null) {
@@ -571,7 +605,6 @@ canvas.addEventListener('click', e => {
     validatePipeline();
     return;
   }
-  // Hit-test edges on left-click on canvas background
   if (e.target === canvas || e.target === edgeCanvas) {
     const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
     const cx = e.clientX - wrap.left - (state.panX || 0);
@@ -589,11 +622,10 @@ canvas.addEventListener('click', e => {
   closeInspector();
   drawEdges();
 });
+
 /* ── DRAW EDGES ───────────────────────────────── */
 function drawEdges() {
   ctx.clearRect(0, 0, edgeCanvas.width, edgeCanvas.height);
-  const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  const z = state.zoom;
 
   state.edges.forEach(edge => {
     const fromNode = state.nodes.find(n => n.id === edge.from);
@@ -604,23 +636,22 @@ function drawEdges() {
     const toEl   = document.getElementById(`node-${edge.to}`);
     if (!fromEl || !toEl) return;
 
-    // 노드의 논리 좌표(state)와 크기를 이용해 edge-canvas 좌표 계산
-    // fromEl의 offsetWidth/offsetHeight는 zoom 무관한 논리 크기
     const fw = fromEl.offsetWidth;
     const fh = fromEl.offsetHeight;
     const tw = toEl.offsetWidth;
 
     const px = state.panX || 0;
     const py = state.panY || 0;
+    const z  = state.zoom;
     const x1 = (fromNode.x + fw / 2) * z + px;
     const y1 = (fromNode.y + fh) * z + py;
     const x2 = (toNode.x  + tw / 2) * z + px;
     const y2 = (toNode.y) * z + py;
 
-    const color     = edge.valid ? '#7ee8a2' : '#f87171';
+    // 항상 accent 색상(연결됨)으로 표시 — 문자열 비교 제거
+    const color      = '#7ee8a2';
     const isSelected = state.selectedEdge === edge;
 
-    // Neon glow layer for selected edge
     if (isSelected) {
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -642,15 +673,13 @@ function drawEdges() {
       ctx.globalAlpha = 1;
     }
 
-    // Main line
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.bezierCurveTo(x1, y1 + (y2 - y1) * 0.5, x2, y1 + (y2 - y1) * 0.5, x2, y2);
     ctx.strokeStyle = color;
     ctx.lineWidth = isSelected ? 2.5 : 2;
-    ctx.setLineDash(edge.valid ? [] : [6, 4]);
-    ctx.stroke();
     ctx.setLineDash([]);
+    ctx.stroke();
 
     drawArrow(ctx, x2, y2, color, isSelected);
   });
@@ -666,14 +695,13 @@ function drawArrow(ctx, x, y, color, selected = false) {
   ctx.fillStyle = color;
   ctx.fill();
 }
+
 /* ── CLONE NODE ───────────────────────────────── */
 function cloneNode(src, x, y) {
   const id = state.nextId++;
   const node = {
     ...JSON.parse(JSON.stringify(src)),
-    id,
-    x,
-    y,
+    id, x, y,
     status: 'pending',
     name: src.name + ' (copy)',
   };
@@ -691,5 +719,4 @@ function resizeCanvas() {
   drawEdges();
 }
 window.addEventListener('resize', resizeCanvas);
-// DOM 레이아웃이 완전히 완성된 후 실행하여 edgeCanvas 크기를 정확히 측정
 requestAnimationFrame(resizeCanvas);

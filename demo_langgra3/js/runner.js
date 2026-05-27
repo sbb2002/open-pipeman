@@ -48,10 +48,73 @@ function getUpstreamSchema(nodeId) {
   return (upstream && upstream.outputSchema) ? upstream.outputSchema : {};
 }
 
+/* ── I/O ASSERTION ────────────────────────────── */
+/**
+ * 실행 전: 노드의 inputContract vs 실제 upstream output_schema 비교
+ * 실행 후: 노드의 outputContract vs LLM이 생성한 output_schema 비교
+ *
+ * @param {object} contract  - 사용자 정의 JSON Schema (inputContract / outputContract)
+ * @param {object} actual    - 실제 데이터의 schema (upstream.outputSchema or result.output_schema)
+ * @param {string} label     - 로그 접두사 ('Input' | 'Output')
+ * @returns {{ pass: boolean, assertions: Array<{pass:boolean, message:string}> }}
+ */
+function assertSchema(contract, actual, label) {
+  const assertions = [];
+
+  if (!contract || !contract.properties) {
+    // contract 미정의 → assertion 스킵 (항상 pass)
+    return { pass: true, assertions };
+  }
+
+  const contractProps = contract.properties;
+  const actualProps   = (actual && actual.properties) ? actual.properties : {};
+
+  for (const [key, def] of Object.entries(contractProps)) {
+    const actualDef = actualProps[key];
+    if (!actualDef) {
+      assertions.push({
+        pass: false,
+        message: `${label}: required key "${key}" (${def.type}) not found in actual schema`,
+      });
+      continue;
+    }
+    // type 비교 (느슨하게: integer는 number와 호환)
+    const expectedType = def.type;
+    const actualType   = actualDef.type;
+    const typeOk = expectedType === actualType
+      || (expectedType === 'number' && actualType === 'integer')
+      || (expectedType === 'integer' && actualType === 'number');
+
+    assertions.push({
+      pass: typeOk,
+      message: typeOk
+        ? `${label}: "${key}" — ${actualType} ✓`
+        : `${label}: "${key}" type mismatch — expected ${expectedType}, got ${actualType}`,
+    });
+  }
+
+  const pass = assertions.every(a => a.pass);
+  return { pass, assertions };
+}
+
 /* SSE 스트림으로 단일 셀 실행 */
 async function runCell(node, upstreamSchema) {
   const url = getBackendUrl();
   const cellId = String(node.id);
+
+  // ── 실행 전 Input assertion ─────────────────────
+  const preAssertions = [];
+  if (node.inputContract) {
+    const { assertions } = assertSchema(node.inputContract, upstreamSchema, 'Input');
+    preAssertions.push(...assertions);
+    const failed = assertions.filter(a => !a.pass);
+    if (failed.length > 0) {
+      failed.forEach(a => appendRunLog(`[${cellId}] ⚠ ASSERT FAIL — ${a.message}`));
+      // assertion 실패는 경고로만 처리 (실행은 계속) — 결과에 기록
+    } else {
+      appendRunLog(`[${cellId}] ✓ Input assertion passed (${assertions.length} checks)`);
+    }
+  }
 
   const body = JSON.stringify({
     cell_id:          cellId,
@@ -112,12 +175,38 @@ async function runCell(node, upstreamSchema) {
             const n = state.nodes.find(x => x.id === node.id);
             if (n) {
               n.outputSchema = payload.output_schema || {};
+
+              // ── 실행 후 Output assertion ────────────
+              const postResult = assertSchema(
+                n.outputContract,
+                payload.output_schema || {},
+                'Output'
+              );
+              if (n.outputContract) {
+                if (postResult.pass) {
+                  appendRunLog(`[${cellId}] ✓ Output assertion passed (${postResult.assertions.length} checks)`);
+                } else {
+                  postResult.assertions.filter(a => !a.pass).forEach(a =>
+                    appendRunLog(`[${cellId}] ⚠ ASSERT FAIL — ${a.message}`)
+                  );
+                }
+              }
+
+              // 모든 assertion 결과를 result에 합산
+              const allAssertions = [...preAssertions, ...postResult.assertions];
+
               n.result = {
                 code:          payload.code          || '',
                 docstring:     payload.docstring     || '',
                 input_schema:  payload.input_schema  || {},
                 output_schema: payload.output_schema || {},
+                assertions:    allAssertions,
               };
+
+              // Inspector가 이 노드를 보고 있으면 assertion 즉시 반영
+              if (typeof _fillResultTab === 'function' && state.selectedNode === node.id) {
+                _fillResultTab(n.result);
+              }
             }
           }
           earlyExit = st;

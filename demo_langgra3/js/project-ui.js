@@ -40,6 +40,51 @@ function clearCanvasForNew(name) {
 }
 
 /* ─────────────────────────────────────────────────
+   구버전 노드 데이터 마이그레이션
+   inputType/outputType → inputContract/outputContract
+   ───────────────────────────────────────────────── */
+function _migrateNodeData(nodeData) {
+  // 이미 contract가 있으면 마이그레이션 불필요
+  if (nodeData.inputContract || nodeData.outputContract) return nodeData;
+
+  // 구버전 필드가 없으면 그대로 반환
+  if (!nodeData.inputType && !nodeData.outputType) return nodeData;
+
+  const migrated = { ...nodeData };
+
+  // inputType이 있으면 단일 키 "value"로 contract 생성
+  if (nodeData.inputType) {
+    migrated.inputContract = {
+      type: 'object',
+      properties: { value: { type: _guessJsonType(nodeData.inputType) } },
+    };
+    delete migrated.inputType;
+    delete migrated.inputDesc;
+  }
+  if (nodeData.outputType) {
+    migrated.outputContract = {
+      type: 'object',
+      properties: { value: { type: _guessJsonType(nodeData.outputType) } },
+    };
+    delete migrated.outputType;
+    delete migrated.outputDesc;
+  }
+
+  return migrated;
+}
+
+/* 구버전 type 문자열 → JSON Schema type */
+function _guessJsonType(typeStr) {
+  const s = (typeStr || '').toLowerCase();
+  if (s === 'int' || s === 'integer')               return 'integer';
+  if (s === 'float' || s === 'number' || s === 'double') return 'number';
+  if (s === 'bool' || s === 'boolean')              return 'boolean';
+  if (s === 'list' || s === 'array')                return 'array';
+  if (s === 'dict' || s === 'object')               return 'object';
+  return 'string'; // VideoFile, TextFile 등 나머지는 string으로
+}
+
+/* ─────────────────────────────────────────────────
    LOAD PIPELINE  (공통)
    ───────────────────────────────────────────────── */
 function loadPipeline(data) {
@@ -59,7 +104,8 @@ function loadPipeline(data) {
 
   if (data.name) document.getElementById('project-name').value = data.name;
 
-  data.nodes.forEach(nodeData => {
+  data.nodes.forEach(rawNode => {
+    const nodeData = _migrateNodeData(rawNode);
     state.nodes.push({ ...nodeData });
     renderNode(nodeData);
   });
@@ -67,7 +113,7 @@ function loadPipeline(data) {
   const maxId = data.nodes.reduce((m, n) => Math.max(m, n.id), 0);
   state.nextId = Math.max(state.nextId, maxId + 1);
 
-  data.edges.forEach(edge => state.edges.push({ ...edge }));
+  data.edges.forEach(edge => state.edges.push({ ...edge, valid: true }));
 
   if (!state.nodes.find(n => n.type === 'input') || !state.nodes.find(n => n.type === 'output')) {
     requestAnimationFrame(initIOCells);
@@ -516,17 +562,15 @@ loadDropzone.addEventListener('drop', e => {
   if (files.length > 0) ingestFiles(files);
 });
 
-/* 드롭존 클릭 → 파일 선택 (label 제외한 영역) */
 loadDropzone.addEventListener('click', e => {
   if (e.target.closest('#load-file-btn') || e.target === loadFileInput) return;
   loadFileInput.click();
 });
 
-/* ── 파일 선택 버튼 ───────────────────────────── */
 loadFileInput.addEventListener('change', e => {
   const files = [...e.target.files].filter(f => f.name.endsWith('.json'));
   if (files.length > 0) ingestFiles(files);
-  loadFileInput.value = ''; // 초기화 (같은 파일 재선택 가능)
+  loadFileInput.value = '';
 });
 
 /* ── JSON 파일 파싱 → localStorage에 추가 ──────── */
